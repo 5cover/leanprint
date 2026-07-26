@@ -3,7 +3,7 @@ import { readFile, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { Command } from '@commander-js/extra-typings'
-import { format } from 'leanprint'
+import { format, getLanguage } from 'leanprint'
 import Config from './Config.js'
 import Leandir from './Leandir.js'
 import Prompt from './Prompt.js'
@@ -22,7 +22,9 @@ program
     .action(async (file, options) => {
         const path = resolve(file),
             source = await readFile(path, 'utf8'),
-            output = format(source, { filepath: path, ...(options.language ? { language: options.language } : {}) })
+            language = options.language ? getLanguage(options.language) : undefined
+        if (options.language && !language) throw new Error(`Language "${options.language}" is not registered.`)
+        const output = language ? format(source, { filepath: path, language }) : format(source, { filepath: path })
         if (options.write) await atomicWrite(path, output)
         else process.stdout.write(output)
     })
@@ -47,8 +49,8 @@ program
     .action(async path => {
         const found = await Config.discover(path, program.opts().config),
             loaded = await Config.load(found.configPath),
-            inLeandir = 'workspace' in loaded
-        if (inLeandir) Config.validateWorkspace(loaded as any, found.root)
+            inLeandir = Config.isGenerated(loaded)
+        if (inLeandir) Config.validateWorkspace(loaded, found.root)
         process.stdout.write(Prompt.generate(loaded, inLeandir))
     })
 program

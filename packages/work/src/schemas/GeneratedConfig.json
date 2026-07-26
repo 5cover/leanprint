@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/GeneratedConfig.json",
+  "title": "GeneratedConfig",
+  "allOf": [
+    {
+      "$ref": "./SourceConfig.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "toolVersion",
+            "sourceRoot",
+            "leandir",
+            "configFilename",
+            "createdAt",
+            "configHash",
+            "resolvedConfigHash",
+            "files",
+            "integrity"
+          ],
+          "properties": {
+            "schemaVersion": { "const": 1 },
+            "toolVersion": { "type": "string" },
+            "sourceRoot": { "type": "string" },
+            "leandir": { "type": "string" },
+            "configFilename": { "type": "string" },
+            "createdAt": { "type": "string" },
+            "configHash": { "type": "string" },
+            "resolvedConfigHash": { "type": "string" },
+            "integrity": { "type": "string" },
+            "files": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "sourceHash", "leanHash", "transformed", "mode"],
+                "properties": {
+                  "kind": { "type": "string", "enum": ["file", "symlink"] },
+                  "sourceHash": { "type": "string" },
+                  "leanHash": { "type": "string" },
+                  "transformed": { "type": "boolean" },
+                  "mode": { "type": "integer" },
+                  "target": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": ["workspace"]
+    }
+  ]
+}

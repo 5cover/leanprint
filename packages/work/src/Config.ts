@@ -1,27 +1,46 @@
 import { readFile, realpath } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
-import type { GeneratedConfig, SourceConfig, WorkspaceMetadata } from './types.js'
-import { InvalidConfigError, InvalidLeandirError } from './types.js'
+import { Ajv2020, type ErrorObject } from 'ajv/dist/2020.js'
+import { ecmascriptConfigSchema, getLanguage } from 'leanprint'
 import { hash, stableJson } from './hash.js'
-const defaults = {
-    ignore: ['.git/**', 'node_modules/**', 'dist/**', 'coverage/**'],
-    parser: {},
-    tokens: {
-        semicolons: false,
-        trailingCommas: false,
-        collapseSingleStatementBlocks: true,
-        parentheses: 'required-only' as const,
-    },
-    source: {
-        indent: 2,
-        lineWrapping: false,
-        maxEmptyLines: 1,
-        spaceAroundOperators: false,
-        spaceAfterControlKeywords: false,
-        lineEnding: 'lf' as const,
-    },
+import generatedSchema from './schemas/GeneratedConfig.json' with { type: 'json' }
+import sourceSchema from './schemas/SourceConfig.json' with { type: 'json' }
+import type { GeneratedConfig, ResolvedSourceConfig, SourceConfig, WorkspaceMetadata } from './types.js'
+import { InvalidConfigError, InvalidLeandirError } from './types.js'
+
+const ajv = new Ajv2020({ allErrors: true, useDefaults: true, coerceTypes: false, removeAdditional: false })
+ajv.addSchema(ecmascriptConfigSchema)
+ajv.addSchema(sourceSchema)
+const validateSource = ajv.getSchema(sourceSchema.$id)!
+const validateGenerated = ajv.compile(generatedSchema)
+
+function describe(errors: ErrorObject[] | null | undefined): string {
+    return (errors ?? [])
+        .map(error => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`)
+        .join('; ')
 }
+
+function resolveLanguages(config: SourceConfig): ResolvedSourceConfig {
+    const languages: ResolvedSourceConfig['languages'] = {}
+    for (const [id, value] of Object.entries(config.languages)) {
+        const language = getLanguage(id)
+        if (!language) throw new InvalidConfigError(`Language "${id}" is configured but not registered.`)
+        languages[id] = language.resolveConfig(value)
+    }
+    const { humanFormatter, ...source } = config
+    const resolved: ResolvedSourceConfig = {
+        ...source,
+        ignore: config.ignore!,
+        languages,
+    }
+    if (humanFormatter) resolved.humanFormatter = { command: humanFormatter.command, args: humanFormatter.args! }
+    return resolved
+}
+
 export default class Config {
+    static isGenerated(config: ResolvedSourceConfig | GeneratedConfig): config is GeneratedConfig {
+        return 'workspace' in config && Boolean(config.workspace)
+    }
     static async discover(
         start = process.cwd(),
         configFilename = 'leanprint.json'
@@ -30,8 +49,8 @@ export default class Config {
             throw new InvalidConfigError("Config filename must be repository-relative and may not contain '..'.")
         let current = resolve(start)
         try {
-            const s = await import('node:fs/promises')
-            if ((await s.stat(current)).isFile()) current = dirname(current)
+            const fs = await import('node:fs/promises')
+            if ((await fs.stat(current)).isFile()) current = dirname(current)
         } catch {
             /* A nonexistent start path is handled by upward discovery. */
         }
@@ -49,57 +68,63 @@ export default class Config {
             current = parent
         }
     }
-    static async load(path: string): Promise<SourceConfig | GeneratedConfig> {
+
+    static async load(path: string): Promise<ResolvedSourceConfig | GeneratedConfig> {
         let parsed: unknown
         try {
             parsed = JSON.parse(await readFile(path, 'utf8'))
         } catch (error) {
             throw new InvalidConfigError(`Could not read config file ${path}: ${(error as Error).message}`)
         }
-        if (!parsed || typeof parsed !== 'object' || typeof (parsed as any).leandir !== 'string')
-            throw new InvalidConfigError(`Config file ${path} must define leandir.`)
-        const raw = parsed as any
-        return {
-            ...raw,
-            ignore: raw.ignore ?? defaults.ignore,
-            parser: { ...defaults.parser, ...raw.parser },
-            tokens: { ...defaults.tokens, ...raw.tokens },
-            source: { ...defaults.source, ...raw.source },
-        }
+        const generated = Boolean(parsed && typeof parsed === 'object' && 'workspace' in parsed)
+        const validate = generated ? validateGenerated : validateSource
+        if (!validate(parsed)) throw new InvalidConfigError(`Invalid config file ${path}: ${describe(validate.errors)}.`)
+        const resolved = resolveLanguages(parsed as SourceConfig)
+        return generated ? ({ ...resolved, workspace: (parsed as GeneratedConfig).workspace } as GeneratedConfig) : resolved
     }
+
     static async source(
         start: string,
         filename: string
-    ): Promise<{ config: SourceConfig; configPath: string; sourceRoot: string }> {
-        const found = await this.discover(start, filename),
-            loaded = await this.load(found.configPath)
-        if ('workspace' in loaded) {
-            this.validateWorkspace(loaded as GeneratedConfig, found.root)
-            const sourceFound = await this.discover((loaded as GeneratedConfig).workspace.sourceRoot, filename)
-            return {
-                config: (await this.load(sourceFound.configPath)) as SourceConfig,
-                configPath: sourceFound.configPath,
-                sourceRoot: sourceFound.root,
-            }
+    ): Promise<{ config: ResolvedSourceConfig; configPath: string; sourceRoot: string }> {
+        const found = await this.discover(start, filename)
+        const loaded = await this.load(found.configPath)
+        if (this.isGenerated(loaded)) {
+            this.validateWorkspace(loaded, found.root)
+            const sourceFound = await this.discover(loaded.workspace.sourceRoot, filename)
+            const source = await this.load(sourceFound.configPath)
+            if (this.isGenerated(source))
+                throw new InvalidConfigError(`Expected a source config file at ${sourceFound.configPath}.`)
+            return { config: source, configPath: sourceFound.configPath, sourceRoot: sourceFound.root }
         }
         return { config: loaded, configPath: found.configPath, sourceRoot: found.root }
     }
+
     static integrity(metadata: Omit<WorkspaceMetadata, 'integrity'>): string {
         return hash(stableJson(metadata))
     }
+
+    static resolvedHash(config: ResolvedSourceConfig): string {
+        const { workspace: _workspace, ...resolved } = config
+        return hash(stableJson(resolved))
+    }
+
     static validateWorkspace(config: GeneratedConfig, root: string): void {
-        const w = config.workspace
-        if (!w || w.schemaVersion !== 1 || resolve(w.leandir) !== resolve(root))
+        const workspace = config.workspace
+        if (resolve(workspace.leandir) !== resolve(root))
             throw new InvalidLeandirError(`Invalid workspace metadata in ${root}.`)
-        const { integrity, ...unsigned } = w
+        if (workspace.resolvedConfigHash !== this.resolvedHash(config))
+            throw new InvalidLeandirError(`Resolved configuration integrity check failed in ${root}.`)
+        const { integrity, ...unsigned } = workspace
         if (integrity !== this.integrity(unsigned))
             throw new InvalidLeandirError(`Workspace metadata integrity check failed in ${root}.`)
     }
+
     static async validateLeandir(sourceRoot: string, leandir: string): Promise<void> {
-        const source = await realpath(sourceRoot),
-            target = await realpath(dirname(leandir))
-                .then(parent => resolve(parent, leandir.split(/[\\/]/).at(-1)!))
-                .catch(() => resolve(leandir))
+        const source = await realpath(sourceRoot)
+        const target = await realpath(dirname(leandir))
+            .then(parent => resolve(parent, leandir.split(/[\\/]/).at(-1)!))
+            .catch(() => resolve(leandir))
         if (target === source || target.startsWith(`${source}/`) || source.startsWith(`${target}/`))
             throw new InvalidConfigError('The leandir must be outside, and not an ancestor of, the source root.')
     }

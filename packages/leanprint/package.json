@@ -10,19 +10,27 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "src/ecmascript/EcmascriptConfig.json"
   ],
   "scripts": {
+    "generate": "json2ts -i src/ecmascript/EcmascriptConfig.json -o src/ecmascript/EcmascriptConfig.generated.ts --bannerComment '/* Generated from EcmascriptConfig.json. Do not edit. */'",
+    "prebuild": "pnpm generate",
     "build": "tsup src/index.ts --format esm --dts",
+    "pretest": "pnpm generate",
     "test": "node --import tsx --test test/**/*.test.ts",
+    "pretypecheck": "pnpm generate",
     "typecheck": "tsc --noEmit",
+    "prelint": "pnpm generate",
     "lint": "eslint src test"
   },
   "dependencies": {
     "@babel/parser": "^7.28.0",
-    "@babel/types": "^7.28.1"
+    "@babel/types": "^7.28.1",
+    "ajv": "^8.20.0"
   },
   "devDependencies": {
+    "json-schema-to-typescript": "^15.0.4",
     "tsx": "^4.20.3"
   },
   "engines": {

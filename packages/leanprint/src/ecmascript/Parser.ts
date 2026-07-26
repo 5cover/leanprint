@@ -15,6 +15,7 @@ export default class Parser implements ParserContract<ParseResult<File>, Ecmascr
             'decorators-legacy',
             'importAttributes',
             'explicitResourceManagement',
+            ...(config.plugins ?? []),
         ] as NonNullable<ParserOptions['plugins']>
         try {
             return parse(source, {

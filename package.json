@@ -5,11 +5,12 @@
   "type": "module",
   "packageManager": "pnpm@10.14.0",
   "scripts": {
+    "generate": "pnpm -r generate",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "ci": "pnpm typecheck && pnpm test && pnpm build",
+    "ci": "pnpm generate && pnpm typecheck && pnpm test && pnpm build",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm build && changeset publish"

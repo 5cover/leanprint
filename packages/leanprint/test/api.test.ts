@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ecmascript, format, UnsupportedLanguageError, UnsupportedNodeError } from '../src/index.js'
+import { ecmascript, format, InvalidConfigError, UnsupportedLanguageError, UnsupportedNodeError } from '../src/index.js'
 const sample = `export function selectActiveUsers(users:readonly User[]):readonly User[]{if(users.length===0){return [];}return users.filter((user)=>{return user.active&&user.email!==null;});}`
 test('formats the documented TypeScript example deterministically', () => {
     const output = format(sample, { filepath: 'example.ts' })
@@ -10,10 +10,16 @@ test('formats the documented TypeScript example deterministically', () => {
     )
     assert.equal(format(output, { filepath: 'example.ts' }), output)
 })
-test('uses explicit language', () =>
-    assert.equal(format('const value = 1;', { language: 'ecmascript' }), 'const value=1\n'))
+test('uses an explicit, strongly typed language object', () =>
+    assert.equal(format('const value = 1;', { language: ecmascript }), 'const value=1\n'))
 test('retains configured semicolons', () =>
     assert.equal(format('const value = 1;', { filepath: 'x.js', tokens: { semicolons: true } }), 'const value=1;\n'))
+test('validates options through the language schema without mutating callers', () => {
+    const source = { indent: 4 }
+    assert.equal(format('if(ok){work()}', { filepath: 'x.js', source }), 'if(ok)work()\n')
+    assert.deepEqual(source, { indent: 4 })
+    assert.throws(() => format('work()', { filepath: 'x.js', source: { indent: -1 } }), InvalidConfigError)
+})
 test('rejects unknown extensions', () =>
     assert.throws(() => format('x', { filepath: 'x.py' }), UnsupportedLanguageError))
 test('fails explicitly for unknown AST nodes', () => {

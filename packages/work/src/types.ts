@@ -1,15 +1,23 @@
+import type { ResolvedEcmascriptConfig, ResolvedLanguageConfig } from 'leanprint'
+export type { SourceConfig } from './schemas/SourceConfig.generated.js'
+
 export interface HumanFormatterConfig {
     command: string
     args: string[]
 }
-export interface SourceConfig {
+
+export interface ResolvedSourceConfig {
+    $schema?: string
     leandir: string
     ignore: string[]
-    parser: Record<string, unknown>
-    tokens: Record<string, unknown>
-    source: Record<string, unknown>
+    languages: {
+        ecmascript?: ResolvedEcmascriptConfig
+        [id: string]: ResolvedLanguageConfig | undefined
+    }
     humanFormatter?: HumanFormatterConfig
+    [key: string]: unknown
 }
+
 export interface FileRecord {
     kind: 'file' | 'symlink'
     sourceHash: string
@@ -18,6 +26,7 @@ export interface FileRecord {
     mode: number
     target?: string
 }
+
 export interface WorkspaceMetadata {
     schemaVersion: 1
     toolVersion: string
@@ -26,17 +35,21 @@ export interface WorkspaceMetadata {
     configFilename: string
     createdAt: string
     configHash: string
+    resolvedConfigHash: string
     files: Record<string, FileRecord>
     integrity: string
 }
-export interface GeneratedConfig extends SourceConfig {
+
+export interface GeneratedConfig extends ResolvedSourceConfig {
     workspace: WorkspaceMetadata
 }
+
 export interface Change {
     path: string
     kind: 'added' | 'modified' | 'deleted'
     conflict?: string
 }
+
 export interface WorkspaceStatus {
     context: 'source project' | 'leandir'
     sourceRoot: string
@@ -44,6 +57,7 @@ export interface WorkspaceStatus {
     changes: Change[]
     conflicts: Change[]
 }
+
 export class InvalidConfigError extends Error {
     override name = 'InvalidConfigError'
 }

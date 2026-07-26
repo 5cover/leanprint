@@ -18,12 +18,16 @@ npm install leanprint
 ```
 
 ```ts
-import { format } from 'leanprint'
+import { ecmascript, format } from 'leanprint'
 
-const output = format(source, { filepath: 'example.ts' })
+const output = format(source, {
+  language: ecmascript,
+  filepath: 'example.ts',
+  tokens: { semicolons: false },
+})
 ```
 
-LeanPrint detects JavaScript, JSX, TypeScript, and TSX from `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, and `.cts`. An explicit `language:"ecmascript"` may be used instead. Unsupported syntax produces an `UnsupportedNodeError`; LeanPrint never silently emits a partial file.
+LeanPrint detects JavaScript, JSX, TypeScript, and TSX from `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, and `.cts`. Pass `language:ecmascript` for strongly typed explicit selection, including sources without a useful filepath. Unsupported syntax produces an `UnsupportedNodeError`; LeanPrint never silently emits a partial file.
 
 ## Leandir workflow
 
@@ -59,25 +63,25 @@ The default config filename is `leanprint.json`. `-c` accepts a repository-relat
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json",
   "leandir": "/tmp/example-project.lean",
   "ignore": [".git/**", "node_modules/**", "dist/**", "coverage/**"],
-  "tokens": {
-    "semicolons": false,
-    "trailingCommas": false,
-    "collapseSingleStatementBlocks": true,
-    "parentheses": "required-only"
-  },
-  "source": {
-    "indent": 2,
-    "lineWrapping": false,
-    "maxEmptyLines": 1,
-    "spaceAroundOperators": false,
-    "spaceAfterControlKeywords": false,
-    "lineEnding": "lf"
+  "languages": {
+    "ecmascript": {
+      "parser": {},
+      "tokens": {
+        "semicolons": false
+      },
+      "source": {
+        "indent": 2
+      }
+    }
   },
   "humanFormatter": { "command": "pnpm", "args": ["exec", "prettier", "--stdin-filepath", "{file}"] }
 }
 ```
+
+`languages` is required; its keys are the language domains enabled for the project. An empty object enables none. Parser, token, source, and ignore defaults are declared in the schemas and applied during AJV validation. Additional properties are retained for forward compatibility. The canonical [source-project configuration schema](https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json) can be assigned to `$schema` for editor validation.
 
 ## Current status and syntax
 

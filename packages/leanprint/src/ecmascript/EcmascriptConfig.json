@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/5cover/leanprint/main/packages/leanprint/src/ecmascript/EcmascriptConfig.json",
+  "title": "EcmascriptConfig",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "parser": {
+      "type": "object",
+      "default": {},
+      "additionalProperties": true,
+      "properties": {
+        "sourceType": {
+          "type": "string",
+          "enum": ["unambiguous", "module", "script"],
+          "default": "unambiguous"
+        },
+        "plugins": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "default": {},
+      "additionalProperties": true,
+      "properties": {
+        "semicolons": { "type": "boolean", "default": false },
+        "trailingCommas": { "type": "boolean", "default": false },
+        "collapseSingleStatementBlocks": { "type": "boolean", "default": true },
+        "parentheses": { "const": "required-only", "default": "required-only" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "default": {},
+      "additionalProperties": true,
+      "properties": {
+        "indent": { "type": "integer", "minimum": 0, "default": 2 },
+        "lineWrapping": { "type": "boolean", "default": false },
+        "maxEmptyLines": { "type": "integer", "minimum": 0, "default": 1 },
+        "spaceAroundOperators": { "type": "boolean", "default": false },
+        "spaceAfterControlKeywords": { "type": "boolean", "default": false },
+        "lineEnding": { "type": "string", "enum": ["lf", "crlf"], "default": "lf" }
+      }
+    }
+  }
+}

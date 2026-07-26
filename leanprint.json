@@ -1,3 +1,7 @@
 {
-  "leandir": "/tmp/leanprint.lean"
+  "$schema": "https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json",
+  "leandir": "/tmp/leanprint.lean",
+  "languages": {
+    "ecmascript": {}
+  }
 }

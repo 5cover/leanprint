@@ -1,17 +1,16 @@
 import { readFile } from 'node:fs/promises'
-import { extname, join } from 'node:path'
+import { join } from 'node:path'
 import { glob } from 'glob'
-import { format } from 'leanprint'
 import Config from '../Config.js'
+import { configuredLanguage, leanify } from '../languages.js'
 import Tiktoken from './Tiktoken.js'
 import type { TiktokenStatsOptions, TokenStats } from './types.js'
-const extensions = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts'])
 export default class Stats {
     static async tiktoken(options: TiktokenStatsOptions): Promise<TokenStats> {
         const filename = options.configFilename ?? 'leanprint.json',
             { config, sourceRoot } = await Config.source(options.root, filename),
             files = (await glob('**/*', { cwd: sourceRoot, dot: true, nodir: true, ignore: config.ignore }))
-                .filter(path => extensions.has(extname(path).toLowerCase()))
+                .filter(path => configuredLanguage(path, config))
                 .sort(),
             tokenizer = new Tiktoken(options.modelOrEncoding)
         let originalTokens = 0,
@@ -19,12 +18,8 @@ export default class Stats {
         try {
             for (const path of files) {
                 const source = await readFile(join(sourceRoot, path), 'utf8'),
-                    lean = format(source, {
-                        filepath: path,
-                        parser: config.parser,
-                        tokens: config.tokens,
-                        source: config.source,
-                    })
+                    configured = configuredLanguage(path, config)!,
+                    lean = leanify(source, path, configured)
                 originalTokens += tokenizer.count(source)
                 leanTokens += tokenizer.count(lean)
             }

@@ -1,16 +1,20 @@
-export interface EcmascriptParserConfig {
-    sourceType: 'unambiguous' | 'module' | 'script'
-    filepath?: string
+import type { EcmascriptConfig } from './EcmascriptConfig.generated.js'
+export type EcmascriptParserOptions = NonNullable<EcmascriptConfig['parser']>
+export type EcmascriptTokenOptions = NonNullable<EcmascriptConfig['tokens']>
+export type EcmascriptSourceOptions = NonNullable<EcmascriptConfig['source']>
+export interface EcmascriptParserConfig extends EcmascriptParserOptions {
+    sourceType: NonNullable<EcmascriptParserOptions['sourceType']>
     plugins?: string[]
+    filepath?: string
 }
-export interface EcmascriptTokenConfig {
+export interface EcmascriptTokenConfig extends EcmascriptTokenOptions {
     semicolons: boolean
     trailingCommas: boolean
     collapseSingleStatementBlocks: boolean
     parentheses: 'required-only'
     filepath?: string
 }
-export interface EcmascriptSourceConfig {
+export interface EcmascriptSourceConfig extends EcmascriptSourceOptions {
     indent: number
     lineWrapping: boolean
     maxEmptyLines: number
@@ -19,19 +23,24 @@ export interface EcmascriptSourceConfig {
     lineEnding: 'lf' | 'crlf'
     semicolons?: boolean
 }
-export const parserDefaults: EcmascriptParserConfig = { sourceType: 'unambiguous' }
-export const tokenDefaults: EcmascriptTokenConfig = {
-    semicolons: false,
-    trailingCommas: false,
-    collapseSingleStatementBlocks: true,
-    parentheses: 'required-only',
+export interface ResolvedEcmascriptConfig {
+    parser: EcmascriptParserOptions & {
+        sourceType: NonNullable<EcmascriptParserOptions['sourceType']>
+        plugins: string[]
+    }
+    tokens: EcmascriptTokenOptions & {
+        semicolons: boolean
+        trailingCommas: boolean
+        collapseSingleStatementBlocks: boolean
+        parentheses: 'required-only'
+    }
+    source: EcmascriptSourceOptions & {
+        indent: number
+        lineWrapping: boolean
+        maxEmptyLines: number
+        spaceAroundOperators: boolean
+        spaceAfterControlKeywords: boolean
+        lineEnding: 'lf' | 'crlf'
+    }
 }
-export const sourceDefaults: EcmascriptSourceConfig = {
-    indent: 2,
-    lineWrapping: false,
-    maxEmptyLines: 1,
-    spaceAroundOperators: false,
-    spaceAfterControlKeywords: false,
-    lineEnding: 'lf',
-    semicolons: false,
-}
+export type { EcmascriptConfig } from './EcmascriptConfig.generated.js'

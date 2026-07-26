@@ -1,15 +1,15 @@
 import { lstat, mkdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
-import { dirname, extname, join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { glob } from 'glob'
-import { format } from 'leanprint'
 import Config from './Config.js'
 import { atomicWrite, ensureEmpty } from './filesystem.js'
 import { hash } from './hash.js'
-import type { Change, FileRecord, GeneratedConfig, SourceConfig, WorkspaceMetadata, WorkspaceStatus } from './types.js'
+import type { Change, FileRecord, GeneratedConfig, ResolvedSourceConfig, WorkspaceMetadata, WorkspaceStatus } from './types.js'
 import { InvalidLeandirError, WorkspaceConflictError } from './types.js'
 import Formatter from './Formatter.js'
+import { configuredLanguage, leanify } from './languages.js'
 const VERSION = '0.1.0',
-    extensions = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts'])
+    WORKSPACE_VERSION = 1
 async function exists(path: string): Promise<boolean> {
     try {
         await lstat(path)
@@ -19,7 +19,7 @@ async function exists(path: string): Promise<boolean> {
         throw error
     }
 }
-async function collect(root: string, config: SourceConfig, configFilename: string): Promise<string[]> {
+async function collect(root: string, config: ResolvedSourceConfig, configFilename: string): Promise<string[]> {
     return (await glob('**/*', { cwd: root, dot: true, nodir: true, follow: false, ignore: config.ignore }))
         .filter(p => p !== configFilename)
         .sort()
@@ -65,33 +65,27 @@ export default class Leandir {
             }
             if (!stat.isFile()) throw new InvalidLeandirError(`Unsupported special entry: ${sourcePath}`)
             const bytes = await readFile(sourcePath),
-                supported = extensions.has(extname(rel).toLowerCase())
-            const output = supported
-                ? Buffer.from(
-                      format(bytes.toString('utf8'), {
-                          filepath: sourcePath,
-                          parser: config.parser,
-                          tokens: config.tokens,
-                          source: config.source,
-                      })
-                  )
-                : bytes
+                language = configuredLanguage(rel, config),
+                supported = Boolean(language),
+                output = language ? Buffer.from(leanify(bytes.toString('utf8'), sourcePath, language)) : bytes
             await atomicWrite(targetPath, output, stat.mode & 0o777)
             files[rel] = await record(sourcePath, supported, bytes, output)
         }
-        const configHash = hash(await readFile(configPath))
+        const configHash = hash(await readFile(configPath)),
+            sessionConfig: ResolvedSourceConfig = { ...config, leandir: target }
         const unsigned: Omit<WorkspaceMetadata, 'integrity'> = {
-            schemaVersion: 1,
+            schemaVersion: WORKSPACE_VERSION,
             toolVersion: VERSION,
             sourceRoot,
             leandir: target,
             configFilename,
             createdAt: new Date().toISOString(),
             configHash,
+            resolvedConfigHash: Config.resolvedHash(sessionConfig),
             files,
         }
         const workspace: WorkspaceMetadata = { ...unsigned, integrity: Config.integrity(unsigned) }
-        const generated: GeneratedConfig = { ...config, leandir: target, workspace }
+        const generated: GeneratedConfig = { ...sessionConfig, workspace }
         await atomicWrite(join(target, configFilename), `${JSON.stringify(generated, null, 2)}\n`)
         return generated
     }
@@ -101,9 +95,9 @@ export default class Leandir {
     ): Promise<{ root: string; config: GeneratedConfig }> {
         const found = await Config.discover(start, filename),
             loaded = await Config.load(found.configPath)
-        if (!('workspace' in loaded)) throw new InvalidLeandirError(`${found.root} is a source project, not a leandir.`)
-        Config.validateWorkspace(loaded as GeneratedConfig, found.root)
-        return { root: found.root, config: loaded as GeneratedConfig }
+        if (!Config.isGenerated(loaded)) throw new InvalidLeandirError(`${found.root} is a source project, not a leandir.`)
+        Config.validateWorkspace(loaded, found.root)
+        return { root: found.root, config: loaded }
     }
     static async status(start = process.cwd(), filename = 'leanprint.json'): Promise<WorkspaceStatus> {
         let context: 'source project' | 'leandir' = 'leandir',
@@ -168,13 +162,9 @@ export default class Leandir {
                 stat = await lstat(leanPath)
             if (!stat.isFile()) continue
             let bytes = await readFile(leanPath)
-            if (extensions.has(extname(change.path).toLowerCase())) {
-                format(bytes.toString('utf8'), {
-                    filepath: change.path,
-                    parser: opened.config.parser,
-                    tokens: opened.config.tokens,
-                    source: opened.config.source,
-                })
+            const language = configuredLanguage(change.path, opened.config)
+            if (language) {
+                leanify(bytes.toString('utf8'), change.path, language)
                 if (!opened.config.humanFormatter)
                     throw new InvalidLeandirError(`No human formatter configured for ${change.path}.`)
                 bytes = Buffer.from(
@@ -185,7 +175,7 @@ export default class Leandir {
                         opened.config.humanFormatter
                     )
                 )
-                format(bytes.toString('utf8'), { filepath: change.path })
+                leanify(bytes.toString('utf8'), change.path, language)
             }
             prepared.set(change.path, { bytes, mode: stat.mode & 0o777 })
         }
@@ -220,7 +210,7 @@ export default class Leandir {
                 kind: 'file',
                 sourceHash: hash(sourceBytes),
                 leanHash: hash(leanBytes),
-                transformed: extensions.has(extname(rel).toLowerCase()),
+                transformed: Boolean(configuredLanguage(rel, opened.config)),
                 mode: stat.mode & 0o777,
             }
         }

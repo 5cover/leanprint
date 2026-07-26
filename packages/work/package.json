@@ -13,22 +13,30 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "src/schemas/*.json"
   ],
   "scripts": {
+    "generate": "cd src/schemas && json2ts -i SourceConfig.json -o SourceConfig.generated.ts --bannerComment '/* Generated from SourceConfig.json. Do not edit. */'",
+    "prebuild": "pnpm generate",
     "build": "tsup src/index.ts src/cli.ts --format esm --dts",
+    "pretest": "pnpm generate",
     "test": "node --import tsx --test test/**/*.test.ts",
+    "pretypecheck": "pnpm generate",
     "typecheck": "tsc --noEmit",
+    "prelint": "pnpm generate",
     "lint": "eslint src test"
   },
   "dependencies": {
     "@commander-js/extra-typings": "^14.0.0",
+    "ajv": "^8.20.0",
     "commander": "^14.0.0",
     "glob": "^11.0.3",
     "leanprint": "workspace:*",
     "tiktoken": "^1.0.22"
   },
   "devDependencies": {
+    "json-schema-to-typescript": "^15.0.4",
     "tsx": "^4.20.3"
   },
   "engines": {
