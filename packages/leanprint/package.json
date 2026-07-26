@@ -16,7 +16,7 @@
   "scripts": {
     "generate": "json2ts -i src/ecmascript/EcmascriptConfig.json -o src/ecmascript/EcmascriptConfig.generated.ts --bannerComment '/* Generated from EcmascriptConfig.json. Do not edit. */'",
     "prebuild": "pnpm generate",
-    "build": "tsup src/index.ts --format esm --dts",
+    "build": "tsdown src/index.ts --format esm --dts --no-fixed-extension",
     "pretest": "pnpm generate",
     "test": "node --import tsx --test test/**/*.test.ts",
     "pretypecheck": "pnpm generate",

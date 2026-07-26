@@ -20,7 +20,7 @@ Use Node.js 24+ and pnpm:
 - `pnpm typecheck`: run strict TypeScript checks.
 - `pnpm test`: run all `node:test` suites.
 - `pnpm lint`: check sources and tests with ESLint.
-- `pnpm build`: use tsup to create ESM bundles and declarations in `dist/`.
+- `pnpm build`: use tsdown to create ESM bundles and declarations in `dist/`.
 - `pnpm ci`: generate, typecheck, test, and build.
 
 Run a package command with `pnpm --filter leanprint test` or `pnpm --filter @leanprint/work test`.

@@ -19,7 +19,7 @@
   "scripts": {
     "generate": "cd src/schemas && json2ts -i SourceConfig.json -o SourceConfig.generated.ts --bannerComment '/* Generated from SourceConfig.json. Do not edit. */' && json2ts -i GeneratedConfig.json -o GeneratedConfig.generated.ts --bannerComment '/* Generated from GeneratedConfig.json. Do not edit. */'",
     "prebuild": "pnpm generate",
-    "build": "tsup src/index.ts src/cli.ts --format esm --dts",
+    "build": "tsdown src/index.ts src/cli.ts --format esm --dts --no-fixed-extension",
     "pretest": "pnpm generate",
     "test": "node --import tsx --test test/**/*.test.ts",
     "pretypecheck": "pnpm generate",

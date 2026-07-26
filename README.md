@@ -101,16 +101,16 @@ pnpm build
 pnpm lint
 ```
 
-The repository uses pnpm workspaces, strict TypeScript, ESM, ESLint, tsup, node:test, Changesets, and GitHub Actions.
+The repository uses pnpm workspaces, strict TypeScript, ESM, ESLint, tsdown, node:test, Changesets, and GitHub Actions.
 
 ## Package and release lifecycle
 
-LeanPrint uses **Changesets** to record release intent and **tsup** to turn the TypeScript sources into npm-ready files.
+LeanPrint uses **Changesets** to record release intent and **tsdown** to turn the TypeScript sources into npm-ready files.
 
 1. **Develop and verify a change.** Work in `packages/leanprint` or `packages/work`, then run `pnpm ci` and `pnpm lint`.
 2. **Add a changeset.** Run `pnpm changeset`, select the affected package and whether the release is a patch, minor, or major, then write a short user-facing summary. This creates a small Markdown file under `.changeset`; commit it with the code. Because the two packages are configured as a fixed group, Changesets keeps their published versions synchronized.
 3. **Apply release versions.** A release maintainer runs `pnpm version-packages`. Changesets consumes pending changeset files, updates package versions and changelogs, and updates internal dependency ranges. Review and commit those generated changes.
-4. **Build packages.** Run `pnpm build`. Each package invokes tsup, which bundles its ESM entry points into `dist/*.js` and generates matching `dist/*.d.ts` TypeScript declarations. The package manifests publish `dist`, not the original implementation files.
+4. **Build packages.** Run `pnpm build`. Each package invokes tsdown, which bundles its ESM entry points into `dist/*.js` and generates matching `dist/*.d.ts` TypeScript declarations. The package manifests publish `dist`, not the original implementation files.
 5. **Publish to npm.** After authenticating with npm and verifying the version commit, run `pnpm release`. This rebuilds both packages and asks Changesets to publish package versions that are not already on the configured npm registry.
 
-In short, a changeset says **what version should change and why**, `version-packages` materializes that decision, tsup creates the distributable files, and `release` publishes them. The root package is private and is never published.
+In short, a changeset says **what version should change and why**, `version-packages` materializes that decision, tsdown creates the distributable files, and `release` publishes them. The root package is private and is never published.
