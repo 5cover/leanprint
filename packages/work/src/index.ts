@@ -1,4 +1,4 @@
-export { default as Config } from './Config.js'
+export * as cfg from './config.js'
 export { default as Leandir } from './Leandir.js'
 export { default as Prompt } from './Prompt.js'
 export { default as Formatter } from './Formatter.js'

@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { Command } from '@commander-js/extra-typings'
 import { format, getLanguage } from 'leanprint'
-import Config from './Config.js'
+import * as cfg from './config.js'
 import Leandir from './Leandir.js'
 import Prompt from './Prompt.js'
 import { replaceFile } from './filesystem.js'
@@ -70,10 +70,10 @@ program
     .argument('[path]', 'project or leandir path', process.cwd())
     .addHelpText('after', '\nExample:\n  leanprint prompt /tmp/project.lean\n')
     .action(async path => {
-        const found = await Config.discover(path, program.opts().config),
-            loaded = await Config.load(found.configPath),
+        const found = await cfg.discover(path, program.opts().config),
+            loaded = await cfg.load(found.configPath),
             inLeandir = loaded.kind === 'leandir'
-        if (loaded.kind === 'leandir') Config.validateWorkspace(loaded.config, found.root)
+        if (loaded.kind === 'leandir') cfg.validateWorkspace(loaded.config, found.root)
         process.stdout.write(Prompt.generate(loaded.config, inLeandir))
     })
 program
@@ -95,8 +95,8 @@ program
     .option('--force', 'skip interactive confirmation')
     .addHelpText('after', '\nExample:\n  leanprint clean /tmp/project.lean\n\nSafety: only a verified generated leandir is removed.\n')
     .action(async (path, options) => {
-        const found = await Config.discover(path, program.opts().config),
-            loaded = await Config.load(found.configPath),
+        const found = await cfg.discover(path, program.opts().config),
+            loaded = await cfg.load(found.configPath),
             opened =
                 loaded.kind === 'leandir'
                     ? await Leandir.open(found.root, program.opts().config)

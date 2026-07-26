@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 import test from 'node:test'
-import Config from '../src/Config.js'
+import * as cfg from '../src/config.js'
 import { compareStrings, stableJson } from '../src/hash.js'
 import Leandir from '../src/Leandir.js'
 import Prompt from '../src/Prompt.js'
@@ -30,9 +30,9 @@ async function fixture() {
 }
 test('discovers config and generates deterministic prompt', async () => {
     const { root } = await fixture(),
-        found = await Config.discover(join(root, 'src'))
+        found = await cfg.discover(join(root, 'src'))
     assert.equal(found.root, root)
-    const { config } = await Config.source(root, 'leanprint.json')
+    const { config } = await cfg.source(root, 'leanprint.json')
     assert.match(Prompt.generate(config, true), /generated LeanPrint leandir/)
     assert.equal(Prompt.generate(config, true), Prompt.generate(config, true))
 })
@@ -44,7 +44,7 @@ test('applies schema defaults while retaining additional properties', async () =
     const { root } = await fixture()
     const path = join(root, 'leanprint.json')
     await writeFile(path, JSON.stringify({ leandir: `${root}.lean`, languages: { ecmascript: {} }, extension: true }))
-    const loaded = await Config.load(path)
+    const loaded = await cfg.load(path)
     assert.equal(loaded.kind, 'source')
     assert.deepEqual(loaded.config.ignore, [])
     assert.equal(loaded.config.languages.ecmascript?.tokens.semicolons, false)
@@ -55,9 +55,9 @@ test('requires languages and rejects unregistered language domains', async () =>
     const { root } = await fixture()
     const path = join(root, 'leanprint.json')
     await writeFile(path, JSON.stringify({ leandir: `${root}.lean` }))
-    await assert.rejects(Config.load(path), InvalidConfigError)
+    await assert.rejects(cfg.load(path), InvalidConfigError)
     await writeFile(path, JSON.stringify({ leandir: `${root}.lean`, languages: { imaginary: {} } }))
-    await assert.rejects(Config.load(path), /not registered/)
+    await assert.rejects(cfg.load(path), /not registered/)
 })
 test('an explicitly empty languages map leaves source files unchanged', async () => {
     const { root, lean } = await fixture()
@@ -185,12 +185,12 @@ test('resolves ignore files from the config directory and reports invalid entrie
         join(root, 'leanprint.json'),
         JSON.stringify({ leandir: lean, languages: {}, ignoreFile: 'missing.ignore' })
     )
-    await assert.rejects(Config.load(join(root, 'leanprint.json')), /Could not read ignore file/)
+    await assert.rejects(cfg.load(join(root, 'leanprint.json')), /Could not read ignore file/)
     await writeFile(
         join(root, 'leanprint.json'),
         JSON.stringify({ leandir: lean, languages: {}, ignoreFile: 'src' })
     )
-    await assert.rejects(Config.load(join(root, 'leanprint.json')), /not a regular file/)
+    await assert.rejects(cfg.load(join(root, 'leanprint.json')), /not a regular file/)
 })
 
 test('updates source changes from either root while preserving unrelated AI edits', async () => {

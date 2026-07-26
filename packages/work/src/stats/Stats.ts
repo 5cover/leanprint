@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import Config from '../Config.js'
+import * as cfg from '../config.js'
 import { configuredLanguage } from '../languages.js'
 import { collectRegularLanguageFiles } from '../scanner.js'
 import Tiktoken from './Tiktoken.js'
@@ -9,7 +9,7 @@ import { InvalidConfigError } from '../types.js'
 export default class Stats {
     static async tiktoken(options: TiktokenStatsOptions): Promise<TokenStats> {
         const filename = options.configFilename ?? 'leanprint.json',
-            { config, sourceRoot } = await Config.source(options.root, filename),
+            { config, sourceRoot } = await cfg.source(options.root, filename),
             files = await collectRegularLanguageFiles(sourceRoot, config, filename, path =>
                 Boolean(configuredLanguage(path, config))
             ),

@@ -1,7 +1,7 @@
 import { mkdir, readFile, rm, symlink } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import packageJson from '../package.json' with { type: 'json' }
-import Config from './Config.js'
+import * as cfg from './config.js'
 import Formatter from './Formatter.js'
 import { ensureEmpty, replaceFile, replaceSymlink } from './filesystem.js'
 import { compareStrings, hash } from './hash.js'
@@ -38,7 +38,7 @@ function changeKind(expected: EntrySnapshot, current: EntrySnapshot): Change['ki
 
 async function saveWorkspace(root: string, filename: string, config: GeneratedConfig): Promise<void> {
     const { integrity: _integrity, ...unsigned } = config.workspace
-    config.workspace = { ...unsigned, integrity: Config.integrity(unsigned) }
+    config.workspace = { ...unsigned, integrity: cfg.checksum(unsigned) }
     await replaceFile(join(root, filename), `${JSON.stringify(config, null, 2)}\n`)
 }
 
@@ -69,9 +69,9 @@ export default class Leandir {
         configFilename = 'leanprint.json',
         force = false
     ): Promise<GeneratedConfig> {
-        const { config, sourceRoot } = await Config.source(start, configFilename)
+        const { config, sourceRoot } = await cfg.source(start, configFilename)
         const target = config.leandir
-        await Config.validateLeandir(sourceRoot, target)
+        await cfg.validateLeandir(sourceRoot, target)
         await ensureEmpty(target, force)
 
         const files: Record<string, FileRecord> = {}
@@ -98,10 +98,10 @@ export default class Leandir {
             leandir: target,
             configFilename,
             createdAt: new Date().toISOString(),
-            resolvedConfigHash: Config.resolvedHash(config),
+            resolvedConfigHash: cfg.resolvedHash(config),
             files,
         }
-        const workspace: WorkspaceMetadata = { ...unsigned, integrity: Config.integrity(unsigned) }
+        const workspace: WorkspaceMetadata = { ...unsigned, integrity: cfg.checksum(unsigned) }
         const generated: GeneratedConfig = { ...config, workspace }
         await saveWorkspace(target, configFilename, generated)
         return generated
@@ -111,11 +111,11 @@ export default class Leandir {
         start = process.cwd(),
         filename = 'leanprint.json'
     ): Promise<{ root: string; config: GeneratedConfig }> {
-        const found = await Config.discover(start, filename)
-        const loaded = await Config.load(found.configPath)
+        const found = await cfg.discover(start, filename)
+        const loaded = await cfg.load(found.configPath)
         if (loaded.kind !== 'leandir')
             throw new InvalidLeandirError(`${found.root} is a source project, not a leandir.`)
-        Config.validateWorkspace(loaded.config, found.root)
+        cfg.validateWorkspace(loaded.config, found.root)
         return { root: found.root, config: loaded.config }
     }
 
@@ -127,11 +127,11 @@ export default class Leandir {
         currentConfig: ResolvedSourceConfig
         context: WorkspaceStatus['context']
     }> {
-        const found = await Config.discover(start, filename)
-        const loaded = await Config.load(found.configPath)
+        const found = await cfg.discover(start, filename)
+        const loaded = await cfg.load(found.configPath)
         if (loaded.kind === 'leandir') {
-            Config.validateWorkspace(loaded.config, found.root)
-            const source = await Config.source(found.root, filename)
+            cfg.validateWorkspace(loaded.config, found.root)
+            const source = await cfg.source(found.root, filename)
             if (resolve(source.config.leandir) !== resolve(found.root))
                 throw new InvalidLeandirError(
                     `Source configuration now points to ${source.config.leandir}, not this leandir (${found.root}).`
@@ -142,7 +142,7 @@ export default class Leandir {
                 context: 'leandir',
             }
         }
-        const source = await Config.source(found.root, filename)
+        const source = await cfg.source(found.root, filename)
         return {
             opened: await this.open(source.config.leandir, filename),
             currentConfig: source.config,
@@ -215,7 +215,7 @@ export default class Leandir {
             leandir: workspace.leandir,
             sourceChanges,
             leandirChanges,
-            configChanged: Config.resolvedHash(currentConfig) !== workspace.resolvedConfigHash,
+            configChanged: cfg.resolvedHash(currentConfig) !== workspace.resolvedConfigHash,
             changes: leandirChanges,
             conflicts,
         }
@@ -281,7 +281,7 @@ export default class Leandir {
 
         const workspace = opened.config.workspace
         workspace.state = 'active'
-        workspace.resolvedConfigHash = Config.resolvedHash(currentConfig)
+        workspace.resolvedConfigHash = cfg.resolvedHash(currentConfig)
         const generated: GeneratedConfig = { ...currentConfig, workspace }
         await saveWorkspace(opened.root, filename, generated)
         return status
