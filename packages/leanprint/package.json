@@ -1,0 +1,31 @@
+{
+  "name": "leanprint",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.28.0",
+    "@babel/types": "^7.28.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

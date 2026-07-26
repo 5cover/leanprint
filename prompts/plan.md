@@ -40,26 +40,24 @@ The initial format uses these defaults:
 Example human-oriented input:
 
 ```ts
-export function selectActiveUsers(
-  users: readonly User[],
-): readonly User[] {
+export function selectActiveUsers(users: readonly User[]): readonly User[] {
   if (users.length === 0) {
-    return [];
+    return []
   }
 
-  return users.filter((user) => {
-    return user.active && user.email !== null;
-  });
+  return users.filter(user => {
+    return user.active && user.email !== null
+  })
 }
 ```
 
 Expected LeanPrint-style output:
 
 ```ts
-export function selectActiveUsers(users:readonly User[]):readonly User[]{
-  if(users.length===0)return []
-  return users.filter(user=>{
-    return user.active&&user.email!==null
+export function selectActiveUsers(users: readonly User[]): readonly User[] {
+  if (users.length === 0) return []
+  return users.filter(user => {
+    return user.active && user.email !== null
   })
 }
 ```
@@ -186,8 +184,8 @@ To transform ordinary valid source code into LeanPrint source using the `leanpri
 Example:
 
 ```ts
-const leanSource=format(source,{
-  filepath:"src/example.ts"
+const leanSource = format(source, {
+  filepath: 'src/example.ts',
 })
 ```
 
@@ -504,9 +502,15 @@ A typed item emitted by a TokenPrinter.
 Fixed syntax tokens use their source lexeme as their token type where practical:
 
 ```ts
-{type:"if"}
-{type:"&&"}
-{type:"("}
+{
+  type: 'if'
+}
+{
+  type: '&&'
+}
+{
+  type: '('
+}
 ```
 
 Dynamic tokens carry typed payloads:
@@ -770,7 +774,7 @@ The total number of tokenizer tokens across the corresponding leanified outputs.
 The signed difference:
 
 ```ts
-originalTokenCount-leanTokenCount
+originalTokenCount - leanTokenCount
 ```
 
 A negative value means LeanPrint increased the token count for the selected tokenizer.
@@ -780,9 +784,7 @@ A negative value means LeanPrint increased the token count for the selected toke
 The signed percentage of original tokens removed:
 
 ```ts
-originalTokenCount===0
-  ?0
-  :tokenSavings/originalTokenCount*100
+originalTokenCount === 0 ? 0 : (tokenSavings / originalTokenCount) * 100
 ```
 
 ## Format
@@ -792,7 +794,7 @@ A direct source-to-source operation over one file or source string.
 At the library level:
 
 ```ts
-format(source,options)
+format(source, options)
 ```
 
 At the CLI level:
@@ -916,8 +918,7 @@ PascalCase implementation files default-export the corresponding main class.
 For example:
 
 ```ts
-export default class SourcePrinter{
-}
+export default class SourcePrinter {}
 ```
 
 Lowercase files contain supporting functions, constants, and types.
@@ -928,16 +929,16 @@ Suggested root scripts:
 
 ```json
 {
-  "private":true,
-  "scripts":{
-    "build":"pnpm -r build",
-    "test":"pnpm -r test",
-    "typecheck":"pnpm -r typecheck",
-    "lint":"pnpm -r lint",
-    "ci":"pnpm typecheck && pnpm test && pnpm build",
-    "changeset":"changeset",
-    "version-packages":"changeset version",
-    "release":"pnpm build && changeset publish"
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "ci": "pnpm typecheck && pnpm test && pnpm build",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm build && changeset publish"
   }
 }
 ```
@@ -946,8 +947,8 @@ The workflow package uses the local core package during development:
 
 ```json
 {
-  "dependencies":{
-    "leanprint":"workspace:*"
+  "dependencies": {
+    "leanprint": "workspace:*"
   }
 }
 ```
@@ -1000,34 +1001,28 @@ The common layer must not define universal syntax tokens or universal AST shapes
 Suggested contracts:
 
 ```ts
-export interface Parser<Ast,Config=undefined>{
-  parse(source:string,config:Config):Ast
+export interface Parser<Ast, Config = undefined> {
+  parse(source: string, config: Config): Ast
 }
 
-export interface TokenPrinter<Ast,Token,Config=undefined>{
-  print(ast:Ast,config:Config):Iterable<Token>
+export interface TokenPrinter<Ast, Token, Config = undefined> {
+  print(ast: Ast, config: Config): Iterable<Token>
 }
 
-export interface SourcePrinter<Token,Config=undefined>{
-  print(tokens:Iterable<Token>,config:Config):string
+export interface SourcePrinter<Token, Config = undefined> {
+  print(tokens: Iterable<Token>, config: Config): string
 }
 
-export interface Language<
-  Ast,
-  Token,
-  ParserConfig,
-  TokenConfig,
-  SourceConfig
->{
-  readonly id:string
-  readonly extensions:readonly string[]
-  readonly parser:Parser<Ast,ParserConfig>
-  readonly tokenPrinter:TokenPrinter<Ast,Token,TokenConfig>
-  readonly sourcePrinter:SourcePrinter<Token,SourceConfig>
-  readonly defaults:{
-    parser:ParserConfig
-    tokens:TokenConfig
-    source:SourceConfig
+export interface Language<Ast, Token, ParserConfig, TokenConfig, SourceConfig> {
+  readonly id: string
+  readonly extensions: readonly string[]
+  readonly parser: Parser<Ast, ParserConfig>
+  readonly tokenPrinter: TokenPrinter<Ast, Token, TokenConfig>
+  readonly sourcePrinter: SourcePrinter<Token, SourceConfig>
+  readonly defaults: {
+    parser: ParserConfig
+    tokens: TokenConfig
+    source: SourceConfig
   }
 }
 ```
@@ -1045,55 +1040,46 @@ Avoid helper sharing between language domains unless a later language demonstrat
 Expose a compact synchronous API.
 
 ```ts
-import {format} from "leanprint"
+import { format } from 'leanprint'
 
-const output=format(source,{
-  filepath:"src/example.ts",
-  tokens:{
-    semicolons:false,
-    trailingCommas:false,
-    collapseSingleStatementBlocks:true,
-    parentheses:"required-only"
+const output = format(source, {
+  filepath: 'src/example.ts',
+  tokens: {
+    semicolons: false,
+    trailingCommas: false,
+    collapseSingleStatementBlocks: true,
+    parentheses: 'required-only',
   },
-  source:{
-    indent:2,
-    lineWrapping:false,
-    maxEmptyLines:1,
-    spaceAroundOperators:false,
-    spaceAfterControlKeywords:false
-  }
+  source: {
+    indent: 2,
+    lineWrapping: false,
+    maxEmptyLines: 1,
+    spaceAroundOperators: false,
+    spaceAfterControlKeywords: false,
+  },
 })
 ```
 
 Suggested API types:
 
 ```ts
-export interface FormatOptions{
-  filepath?:string
-  language?:string
-  parser?:Record<string,unknown>
-  tokens?:Record<string,unknown>
-  source?:Record<string,unknown>
+export interface FormatOptions {
+  filepath?: string
+  language?: string
+  parser?: Record<string, unknown>
+  tokens?: Record<string, unknown>
+  source?: Record<string, unknown>
 }
 
-export function format(
-  source:string,
-  options:FormatOptions
-):string
+export function format(source: string, options: FormatOptions): string
 ```
 
 Also expose lower-level pieces for advanced consumers:
 
 ```ts
-export {
-  defineLanguage,
-  getLanguage,
-  registerLanguage
-}
+export { defineLanguage, getLanguage, registerLanguage }
 
-export {
-  ecmascript
-}
+export { ecmascript }
 ```
 
 Language resolution rules:
@@ -1144,34 +1130,34 @@ Fixed syntax tokens should use their actual spelling as their type.
 Examples:
 
 ```ts
-type FixedTokenType=
-  |"if"
-  |"else"
-  |"for"
-  |"return"
-  |"function"
-  |"class"
-  |"const"
-  |"let"
-  |"var"
-  |"&&"
-  |"||"
-  |"??"
-  |"=>"
-  |"+"
-  |"-"
-  |"*"
-  |"/"
-  |"("
-  |")"
-  |"["
-  |"]"
-  |"{"
-  |"}"
-  |"."
-  |","
-  |":"
-  |";"
+type FixedTokenType =
+  | 'if'
+  | 'else'
+  | 'for'
+  | 'return'
+  | 'function'
+  | 'class'
+  | 'const'
+  | 'let'
+  | 'var'
+  | '&&'
+  | '||'
+  | '??'
+  | '=>'
+  | '+'
+  | '-'
+  | '*'
+  | '/'
+  | '('
+  | ')'
+  | '['
+  | ']'
+  | '{'
+  | '}'
+  | '.'
+  | ','
+  | ':'
+  | ';'
 ```
 
 The complete union should cover every fixed token emitted by the supported printer.
@@ -1179,20 +1165,20 @@ The complete union should cover every fixed token emitted by the supported print
 Dynamic tokens use structured payloads:
 
 ```ts
-type Token=
-  |{type:FixedTokenType}
-  |{type:"ident";value:string}
-  |{type:"private-ident";value:string}
-  |{type:"number";value:string}
-  |{type:"bigint";value:string}
-  |{type:"string";value:string}
-  |{type:"regex";pattern:string;flags:string}
-  |{type:"template-chunk";value:string}
-  |{type:"comment";kind:"line"|"block";value:string}
-  |{type:"statement-boundary";mode:"normal"|"required"}
-  |{type:"line";kind:"soft"|"hard"}
-  |{type:"indent"}
-  |{type:"dedent"}
+type Token =
+  | { type: FixedTokenType }
+  | { type: 'ident'; value: string }
+  | { type: 'private-ident'; value: string }
+  | { type: 'number'; value: string }
+  | { type: 'bigint'; value: string }
+  | { type: 'string'; value: string }
+  | { type: 'regex'; pattern: string; flags: string }
+  | { type: 'template-chunk'; value: string }
+  | { type: 'comment'; kind: 'line' | 'block'; value: string }
+  | { type: 'statement-boundary'; mode: 'normal' | 'required' }
+  | { type: 'line'; kind: 'soft' | 'hard' }
+  | { type: 'indent' }
+  | { type: 'dedent' }
 ```
 
 Adjust the union as implementation requires.
@@ -1288,8 +1274,8 @@ It does not own:
 Use generator methods where practical:
 
 ```ts
-export default class TokenPrinter{
-  *print(ast:Program,config:TokenPrinterConfig):Iterable<Token>{
+export default class TokenPrinter {
+  *print(ast: Program, config: TokenPrinterConfig): Iterable<Token> {
     yield* this.printProgram(ast)
   }
 }
@@ -1331,8 +1317,8 @@ Use a precedence table plus explicit grammar exceptions.
 The basic comparison is:
 
 ```ts
-if(childPrecedence<parentPrecedence)return true
-if(childPrecedence>parentPrecedence)return false
+if (childPrecedence < parentPrecedence) return true
+if (childPrecedence > parentPrecedence) return false
 ```
 
 Equal precedence must account for:
@@ -1352,13 +1338,13 @@ Do not apply algebraic transformations.
 For example:
 
 ```ts
-a+(b+c)
+a + (b + c)
 ```
 
 must not become:
 
 ```ts
-a+b+c
+a + b + c
 ```
 
 because JavaScript addition may perform string concatenation.
@@ -1385,11 +1371,7 @@ Include explicit rules and tests for at least:
 A useful API is:
 
 ```ts
-export function needsParentheses(
-  child:Expression,
-  parent:Node,
-  position:ExpressionPosition
-):boolean
+export function needsParentheses(child: Expression, parent: Node, position: ExpressionPosition): boolean
 ```
 
 Keep precedence and grammar logic independently testable.
@@ -1403,7 +1385,7 @@ When `collapseSingleStatementBlocks` is enabled, conservatively collapse simple 
 Examples:
 
 ```ts
-if(!value){
+if (!value) {
   return null
 }
 ```
@@ -1411,7 +1393,7 @@ if(!value){
 may become:
 
 ```ts
-if(!value)return null
+if (!value) return null
 ```
 
 Do not remove braces when doing so could:
@@ -1464,7 +1446,7 @@ Virtual tokens may be accumulated until the next concrete token makes the separa
 The printer should choose among:
 
 ```ts
-type Separator=""|" "|"\n"|";"|";\n"
+type Separator = '' | ' ' | '\n' | ';' | ';\n'
 ```
 
 The actual internal representation may differ.
@@ -1474,10 +1456,7 @@ The actual internal representation may differ.
 Implement a function such as:
 
 ```ts
-function requiredSeparator(
-  previous:ConcreteToken,
-  next:ConcreteToken
-):""|" "
+function requiredSeparator(previous: ConcreteToken, next: ConcreteToken): '' | ' '
 ```
 
 Broad defaults may use token families:
@@ -1606,20 +1585,20 @@ Comment placement must not alter program behavior.
 Define typed defaults for ECMAScript.
 
 ```ts
-export interface EcmascriptTokenConfig{
-  semicolons:boolean
-  trailingCommas:boolean
-  collapseSingleStatementBlocks:boolean
-  parentheses:"required-only"
+export interface EcmascriptTokenConfig {
+  semicolons: boolean
+  trailingCommas: boolean
+  collapseSingleStatementBlocks: boolean
+  parentheses: 'required-only'
 }
 
-export interface EcmascriptSourceConfig{
-  indent:number
-  lineWrapping:boolean
-  maxEmptyLines:number
-  spaceAroundOperators:boolean
-  spaceAfterControlKeywords:boolean
-  lineEnding:"lf"|"crlf"
+export interface EcmascriptSourceConfig {
+  indent: number
+  lineWrapping: boolean
+  maxEmptyLines: number
+  spaceAroundOperators: boolean
+  spaceAfterControlKeywords: boolean
+  lineEnding: 'lf' | 'crlf'
 }
 ```
 
@@ -1627,19 +1606,19 @@ Default values:
 
 ```json
 {
-  "tokens":{
-    "semicolons":false,
-    "trailingCommas":false,
-    "collapseSingleStatementBlocks":true,
-    "parentheses":"required-only"
+  "tokens": {
+    "semicolons": false,
+    "trailingCommas": false,
+    "collapseSingleStatementBlocks": true,
+    "parentheses": "required-only"
   },
-  "source":{
-    "indent":2,
-    "lineWrapping":false,
-    "maxEmptyLines":1,
-    "spaceAroundOperators":false,
-    "spaceAfterControlKeywords":false,
-    "lineEnding":"lf"
+  "source": {
+    "indent": 2,
+    "lineWrapping": false,
+    "maxEmptyLines": 1,
+    "spaceAroundOperators": false,
+    "spaceAfterControlKeywords": false,
+    "lineEnding": "lf"
   }
 }
 ```
@@ -1654,9 +1633,9 @@ Its package manifest should contain:
 
 ```json
 {
-  "name":"@leanprint/work",
-  "bin":{
-    "leanprint":"dist/cli.js"
+  "name": "@leanprint/work",
+  "bin": {
+    "leanprint": "dist/cli.js"
   }
 }
 ```
@@ -1859,10 +1838,8 @@ Reduction: 25.01%
 Calculate reduction as:
 
 ```ts
-const saved=originalTokens-leanTokens
-const percentage=originalTokens===0
-  ?0
-  :saved/originalTokens*100
+const saved = originalTokens - leanTokens
+const percentage = originalTokens === 0 ? 0 : (saved / originalTokens) * 100
 ```
 
 Do not assume LeanPrint always reduces the token count.
@@ -1878,14 +1855,14 @@ For `--json`, emit machine-readable output only:
 
 ```json
 {
-  "backend":"tiktoken",
-  "requested":"gpt-4o",
-  "encoding":"o200k_base",
-  "files":147,
-  "originalTokens":382410,
-  "leanTokens":286772,
-  "tokensSaved":95638,
-  "reductionPercentage":25.01
+  "backend": "tiktoken",
+  "requested": "gpt-4o",
+  "encoding": "o200k_base",
+  "files": 147,
+  "originalTokens": 382410,
+  "leanTokens": 286772,
+  "tokensSaved": 95638,
+  "reductionPercentage": 25.01
 }
 ```
 
@@ -1917,16 +1894,16 @@ For the MVP, an unreadable supported file should fail the command with its path 
 For each supported file:
 
 ```ts
-const source=readFile(path,"utf8")
-const lean=format(source,{
-  filepath:path,
-  parser:config.parser,
-  tokens:config.tokens,
-  source:config.source
+const source = readFile(path, 'utf8')
+const lean = format(source, {
+  filepath: path,
+  parser: config.parser,
+  tokens: config.tokens,
+  source: config.source,
 })
 
-const originalCount=encoding.encode(source).length
-const leanCount=encoding.encode(lean).length
+const originalCount = encoding.encode(source).length
+const leanCount = encoding.encode(lean).length
 ```
 
 Accumulate counts without retaining all source strings or encoded token arrays.
@@ -1942,25 +1919,23 @@ Do not write leanified output to disk.
 Expose a programmatic API from `@leanprint/work`:
 
 ```ts
-export interface TiktokenStatsOptions{
-  root:string
-  modelOrEncoding?:string
+export interface TiktokenStatsOptions {
+  root: string
+  modelOrEncoding?: string
 }
 
-export interface TokenStats{
-  backend:"tiktoken"
-  requested:string
-  encoding:string
-  files:number
-  originalTokens:number
-  leanTokens:number
-  tokensSaved:number
-  reductionPercentage:number
+export interface TokenStats {
+  backend: 'tiktoken'
+  requested: string
+  encoding: string
+  files: number
+  originalTokens: number
+  leanTokens: number
+  tokensSaved: number
+  reductionPercentage: number
 }
 
-export function getTiktokenStats(
-  options:TiktokenStatsOptions
-):Promise<TokenStats>
+export function getTiktokenStats(options: TiktokenStatsOptions): Promise<TokenStats>
 ```
 
 The exact naming may vary, but keep the tokenizer backend visible in the API.
@@ -2037,35 +2012,25 @@ Example:
 
 ```json
 {
-  "leandir":"/tmp/example-project.lean",
-  "ignore":[
-    ".git/**",
-    "node_modules/**",
-    "dist/**",
-    "coverage/**"
-  ],
-  "tokens":{
-    "semicolons":false,
-    "trailingCommas":false,
-    "collapseSingleStatementBlocks":true,
-    "parentheses":"required-only"
+  "leandir": "/tmp/example-project.lean",
+  "ignore": [".git/**", "node_modules/**", "dist/**", "coverage/**"],
+  "tokens": {
+    "semicolons": false,
+    "trailingCommas": false,
+    "collapseSingleStatementBlocks": true,
+    "parentheses": "required-only"
   },
-  "source":{
-    "indent":2,
-    "lineWrapping":false,
-    "maxEmptyLines":1,
-    "spaceAroundOperators":false,
-    "spaceAfterControlKeywords":false,
-    "lineEnding":"lf"
+  "source": {
+    "indent": 2,
+    "lineWrapping": false,
+    "maxEmptyLines": 1,
+    "spaceAroundOperators": false,
+    "spaceAfterControlKeywords": false,
+    "lineEnding": "lf"
   },
-  "humanFormatter":{
-    "command":"pnpm",
-    "args":[
-      "exec",
-      "prettier",
-      "--stdin-filepath",
-      "{file}"
-    ]
+  "humanFormatter": {
+    "command": "pnpm",
+    "args": ["exec", "prettier", "--stdin-filepath", "{file}"]
   }
 }
 ```
@@ -2118,57 +2083,47 @@ Example:
 
 ```json
 {
-  "leandir":"/tmp/example-project.lean",
-  "ignore":[
-    ".git/**",
-    "node_modules/**",
-    "dist/**",
-    "coverage/**"
-  ],
-  "tokens":{
-    "semicolons":false,
-    "trailingCommas":false,
-    "collapseSingleStatementBlocks":true,
-    "parentheses":"required-only"
+  "leandir": "/tmp/example-project.lean",
+  "ignore": [".git/**", "node_modules/**", "dist/**", "coverage/**"],
+  "tokens": {
+    "semicolons": false,
+    "trailingCommas": false,
+    "collapseSingleStatementBlocks": true,
+    "parentheses": "required-only"
   },
-  "source":{
-    "indent":2,
-    "lineWrapping":false,
-    "maxEmptyLines":1,
-    "spaceAroundOperators":false,
-    "spaceAfterControlKeywords":false,
-    "lineEnding":"lf"
+  "source": {
+    "indent": 2,
+    "lineWrapping": false,
+    "maxEmptyLines": 1,
+    "spaceAroundOperators": false,
+    "spaceAfterControlKeywords": false,
+    "lineEnding": "lf"
   },
-  "humanFormatter":{
-    "command":"pnpm",
-    "args":[
-      "exec",
-      "prettier",
-      "--stdin-filepath",
-      "{file}"
-    ]
+  "humanFormatter": {
+    "command": "pnpm",
+    "args": ["exec", "prettier", "--stdin-filepath", "{file}"]
   },
-  "workspace":{
-    "schemaVersion":1,
-    "toolVersion":"0.1.0",
-    "sourceRoot":"/home/user/example-project",
-    "leandir":"/tmp/example-project.lean",
-    "createdAt":"2026-07-26T10:20:00.000Z",
-    "configHash":"sha256:...",
-    "files":{
-      "src/index.ts":{
-        "kind":"file",
-        "sourceHash":"sha256:...",
-        "leanHash":"sha256:...",
-        "transformed":true,
-        "mode":420
+  "workspace": {
+    "schemaVersion": 1,
+    "toolVersion": "0.1.0",
+    "sourceRoot": "/home/user/example-project",
+    "leandir": "/tmp/example-project.lean",
+    "createdAt": "2026-07-26T10:20:00.000Z",
+    "configHash": "sha256:...",
+    "files": {
+      "src/index.ts": {
+        "kind": "file",
+        "sourceHash": "sha256:...",
+        "leanHash": "sha256:...",
+        "transformed": true,
+        "mode": 420
       },
-      "package.json":{
-        "kind":"file",
-        "sourceHash":"sha256:...",
-        "leanHash":"sha256:...",
-        "transformed":false,
-        "mode":420
+      "package.json": {
+        "kind": "file",
+        "sourceHash": "sha256:...",
+        "leanHash": "sha256:...",
+        "transformed": false,
+        "mode": 420
       }
     }
   }
@@ -2222,12 +2177,14 @@ Creation algorithm:
     - write the lean output into the leandir
     - hash the lean output
     - record `transformed:true`
+
 13. For every other copied file:
 
     - hash the original bytes
     - copy bytes unchanged
     - record identical source and lean hashes
     - record `transformed:false`
+
 14. Replace the copied `leanprint.json` with the generated leandir descriptor.
 15. Write files atomically where practical.
 
@@ -2326,14 +2283,9 @@ Example:
 
 ```json
 {
-  "humanFormatter":{
-    "command":"pnpm",
-    "args":[
-      "exec",
-      "prettier",
-      "--stdin-filepath",
-      "{file}"
-    ]
+  "humanFormatter": {
+    "command": "pnpm",
+    "args": ["exec", "prettier", "--stdin-filepath", "{file}"]
   }
 }
 ```
@@ -2453,7 +2405,7 @@ Also cover restricted productions and postfix updates.
 For every supported fixture:
 
 ```ts
-format(format(source,options),options)===format(source,options)
+format(format(source, options), options) === format(source, options)
 ```
 
 ## Parse-equivalence tests
@@ -2626,10 +2578,10 @@ leanprint sync
 Document library usage:
 
 ```ts
-import {format} from "leanprint"
+import { format } from 'leanprint'
 
-const output=format(source,{
-  filepath:"example.ts"
+const output = format(source, {
+  filepath: 'example.ts',
 })
 ```
 

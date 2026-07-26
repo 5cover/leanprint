@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
-    "incremental": true,
-    "target": "ES2022",
+    "target": "ES2023",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
@@ -10,15 +9,8 @@
     "noImplicitOverride": true,
     "declaration": true,
     "sourceMap": true,
-    "outDir": "dist",
-    "rootDir": ".",
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
-    "types": [
-      "node"
-    ]
-  },
-  "include": [
-    "**/*.ts",
-  ]
+    "types": ["node"]
+  }
 }
