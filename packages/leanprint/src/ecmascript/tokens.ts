@@ -49,6 +49,9 @@ export const symbolTokenTypes = [
     '<<',
     '>>',
     '>>>',
+    '<<=',
+    '>>=',
+    '>>>=',
     '&',
     '|',
     '^',
@@ -63,6 +66,7 @@ export const symbolTokenTypes = [
     '&&=',
     '||=',
     '??=',
+    '|>',
     '...',
     '@',
     '#',
@@ -116,6 +120,19 @@ export type FixedTokenType =
     | 'const'
     | 'let'
     | 'var'
+    | 'using'
+    | 'debugger'
+    | 'with'
+    | 'override'
+    | 'accessor'
+    | 'constructor'
+    | 'bigint'
+    | 'intrinsic'
+    | 'out'
+    | 'unique'
+    | 'global'
+    | 'module'
+    | 'require'
     | 'interface'
     | 'type'
     | 'enum'

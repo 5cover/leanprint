@@ -19,7 +19,7 @@ export default class Tiktoken {
     readonly requested: string
     readonly encoding: string
     private readonly instance: Encoding
-    constructor(requested = 'o200k_base') {
+    constructor(requested = 'gpt-5-chat-latest') {
         this.requested = requested
         try {
             if (encodings.is(requested)) {

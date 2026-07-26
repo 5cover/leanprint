@@ -11,4 +11,4 @@ const lean = format('const answer: number = 42;', { filepath: 'answer.ts' })
 
 The package also exports `ecmascript`, `defineLanguage`, `getLanguage`, `registerLanguage`, generic language contracts, and typed errors. It performs no filesystem or workflow operations.
 
-Current unsupported Babel nodes fail with `UnsupportedNodeError`; see the root README for the current syntax boundary.
+The enabled ECMAScript, TypeScript, and JSX Babel node families are supported. Flow and parser proposal plugins not enabled by the ECMAScript domain remain outside its syntax boundary. Unknown future nodes fail with `UnsupportedNodeError`.

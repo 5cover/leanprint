@@ -1,6 +1,6 @@
 import type { SourcePrinter as Contract } from '../types.js'
 import type { EcmascriptSourceConfig } from './types.js'
-import { isSymbolToken, isWordToken, type ConcreteToken, type Token } from './tokens.js'
+import { isSymbolToken, isWordToken, symbolTokenTypes, type ConcreteToken, type Token } from './tokens.js'
 const operatorTypes = new Set([
     '+',
     '-',
@@ -25,6 +25,9 @@ const operatorTypes = new Set([
     '<<',
     '>>',
     '>>>',
+    '<<=',
+    '>>=',
+    '>>>=',
     '&',
     '|',
     '^',
@@ -38,28 +41,8 @@ const operatorTypes = new Set([
     'as',
     'satisfies',
 ])
-const hazardousStarts = new Set(['(', '[', '`', 'regex', '+', '-'])
-const unsafePairs = new Set([
-    '++',
-    '--',
-    '//',
-    '/*',
-    '<<',
-    '>>',
-    '?.',
-    '**',
-    '&&',
-    '||',
-    '??',
-    '=>',
-    '==',
-    '!=',
-    '<=',
-    '>=',
-    '${',
-    '+++',
-    '---',
-])
+const hazardousStarts = new Set(['(', '[', '`', 'regex', '+', '-', '*'])
+const punctuatorsByLength = [...symbolTokenTypes].sort((left, right) => right.length - left.length)
 function text(token: ConcreteToken): string {
     switch (token.type) {
         case 'ident':
@@ -86,15 +69,14 @@ export function requiredSeparator(previous: ConcreteToken, next: ConcreteToken):
     if (['return', 'throw', 'yield', 'await', 'new', 'delete', 'void', 'typeof'].includes(previous.type)) return ' '
     const a = text(previous),
         b = text(next)
-    if (
-        isSymbolToken(previous) &&
-        isSymbolToken(next) &&
-        (unsafePairs.has(a + b) || (/[+\-<>&|=?*/]/.test(a.at(-1) ?? '') && a.at(-1) === b[0]))
-    )
-        return ' '
+    if (isSymbolToken(previous)) {
+        const combined = a + b
+        if (punctuatorsByLength.some(punctuator => punctuator.length > a.length && combined.startsWith(punctuator)))
+            return ' '
+    }
     if (
         (previous.type === 'number-literal' && next.type === '.') ||
-        (previous.type === '/' && (next.type === '/' || next.type === '*'))
+        (previous.type === '/' && (next.type === '/' || next.type === '*' || next.type === 'regex'))
     )
         return ' '
     return ''

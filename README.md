@@ -81,9 +81,9 @@ The default config filename is `leanprint.json`. `-c` accepts a repository-relat
 
 ## Current status and syntax
 
-This initial vertical slice supports modules, variables, functions and arrows, calls, members and optional members, arrays, objects, literals, templates, unary/update/binary/logical/assignment/conditional/sequence expressions, common control flow, classes and fields, basic JSX, and a TypeScript subset including annotations, references, arrays, unions/intersections, `as`, `satisfies`, non-null assertions, type aliases, and basic interfaces.
+The ECMAScript domain covers every standardized, TypeScript, and JSX node exposed by the installed Babel AST version for the parser plugins LeanPrint enables. This includes complete statement and control-flow forms, modules and import attributes, explicit resource management, decorators, classes and fields, JSX/TSX, and TypeScript declarations and type syntax.
 
-Switch/try statements, enums, namespaces, advanced type members, decorators, and advanced JSX/TSX forms are not yet implemented. They parse but fail explicitly at the first unsupported Babel AST node. Comment preservation is present in the token model but attachment coverage remains limited. See the package README for the exact supported vertical slice.
+Flow syntax and experimental proposal families that are not enabled in the parser—such as pipeline, record/tuple, bind, module-expression, and do-expression proposals—are outside the current language domain. If an enabled parser or a future Babel release produces an unknown node, LeanPrint fails explicitly with `UnsupportedNodeError` rather than emitting partial source.
 
 ## Development
 
