@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { glob } from 'glob'
 import Config from './Config.js'
 import { atomicWrite, ensureEmpty } from './filesystem.js'
-import { hash } from './hash.js'
+import { compareStrings, hash } from './hash.js'
 import type { Change, FileRecord, GeneratedConfig, ResolvedSourceConfig, WorkspaceMetadata, WorkspaceStatus } from './types.js'
 import { InvalidLeandirError, WorkspaceConflictError } from './types.js'
 import Formatter from './Formatter.js'
@@ -22,7 +22,7 @@ async function exists(path: string): Promise<boolean> {
 async function collect(root: string, config: ResolvedSourceConfig, configFilename: string): Promise<string[]> {
     return (await glob('**/*', { cwd: root, dot: true, nodir: true, follow: false, ignore: config.ignore }))
         .filter(p => p !== configFilename)
-        .sort()
+        .sort(compareStrings)
 }
 async function record(path: string, transformed: boolean, sourceBytes: Buffer, leanBytes: Buffer): Promise<FileRecord> {
     const stat = await lstat(path)

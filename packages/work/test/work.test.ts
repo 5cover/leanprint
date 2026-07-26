@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
 import Config from '../src/Config.js'
+import { compareStrings, stableJson } from '../src/hash.js'
 import Leandir from '../src/Leandir.js'
 import Prompt from '../src/Prompt.js'
 import { InvalidConfigError, type GeneratedConfig } from '../src/types.js'
@@ -31,6 +32,10 @@ test('discovers config and generates deterministic prompt', async () => {
     const { config } = await Config.source(root, 'leanprint.json')
     assert.match(Prompt.generate(config, true), /generated LeanPrint leandir/)
     assert.equal(Prompt.generate(config, true), Prompt.generate(config, true))
+})
+test('uses locale-independent ordinal string ordering', () => {
+    assert.deepEqual(['z', 'ä', 'a'].sort(compareStrings), ['a', 'z', 'ä'])
+    assert.equal(stableJson({ ä: 1, z: 2, a: 3 }), '{"a":3,"z":2,"ä":1}')
 })
 test('applies schema defaults while retaining additional properties', async () => {
     const { root } = await fixture()

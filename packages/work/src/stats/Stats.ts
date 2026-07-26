@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { glob } from 'glob'
 import Config from '../Config.js'
+import { compareStrings } from '../hash.js'
 import { configuredLanguage, leanify } from '../languages.js'
 import Tiktoken from './Tiktoken.js'
 import type { TiktokenStatsOptions, TokenStats } from './types.js'
@@ -11,7 +12,7 @@ export default class Stats {
             { config, sourceRoot } = await Config.source(options.root, filename),
             files = (await glob('**/*', { cwd: sourceRoot, dot: true, nodir: true, ignore: config.ignore }))
                 .filter(path => configuredLanguage(path, config))
-                .sort(),
+                .sort(compareStrings),
             tokenizer = new Tiktoken(options.modelOrEncoding)
         let originalTokens = 0,
             leanTokens = 0
