@@ -1,0 +1,22 @@
+{
+  "name": "leanprint",
+  "version": "1.0.0",
+  "keywords": [],
+  "author": "5cover",
+  "license": "MIT",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.14.0",
+      "onFail": "download"
+    }
+  },
+  "type": "module",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.1.1",
+    "eslint": "^10.8.0",
+    "jiti": "^2.7.0",
+    "typescript-eslint": "^8.65.0"
+  }
+}
