@@ -7,7 +7,7 @@
   "$defs": {
     "config": {
       "type": "object",
-      "additionalProperties": true,
+      
       "required": ["leandir", "languages"],
       "properties": {
         "$schema": { "type": "string", "description": "JSON Schema URL used by editors." },
@@ -37,7 +37,7 @@
         "humanFormatter": {
           "description": "Formatter used only when pulling supported AI-edited source with sync. Lean source is sent on stdin and human source must be returned on stdout. The process runs in the source root with shell:false; every {file} argument placeholder is replaced by the absolute destination filename. Spawn errors, nonzero exits, invalid output, and stderr on failure abort sync before ordinary source writes.",
           "type": "object",
-          "additionalProperties": true,
+          
           "required": ["command"],
           "properties": {
             "command": { "type": "string", "minLength": 1, "description": "Executable name or path; it is invoked directly with shell:false.", "examples": ["pnpm"] },

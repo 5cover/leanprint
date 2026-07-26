@@ -5,6 +5,7 @@ import { configuredLanguage } from '../languages.js'
 import { collectRegularLanguageFiles } from '../scanner.js'
 import Tiktoken from './Tiktoken.js'
 import type { TiktokenStatsOptions, TokenStats } from './types.js'
+import { InvalidConfigError } from '../types.js'
 export default class Stats {
     static async tiktoken(options: TiktokenStatsOptions): Promise<TokenStats> {
         const filename = options.configFilename ?? 'leanprint.json',
@@ -18,8 +19,9 @@ export default class Stats {
         try {
             for (const path of files) {
                 const source = await readFile(join(sourceRoot, path), 'utf8'),
-                    configured = configuredLanguage(path, config)!,
-                    lean = configured.leanify(source, path)
+                    configured = configuredLanguage(path, config)
+                if (!configured) throw new InvalidConfigError(`language not found for config and file ${path}`)
+                const lean = configured.leanify(source, path)
                 originalTokens += tokenizer.count(source)
                 leanTokens += tokenizer.count(lean)
             }

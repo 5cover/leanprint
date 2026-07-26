@@ -35,9 +35,9 @@ export interface Change {
     path: string
     kind: 'added' | 'modified' | 'deleted'
     conflict?: string
-    sourceExpected?: EntrySnapshot
-    sourceCurrent?: EntrySnapshot
-    leanCurrent?: EntrySnapshot
+    sourceExpected: EntrySnapshot
+    sourceCurrent: EntrySnapshot
+    leanCurrent: EntrySnapshot
 }
 
 export interface WorkspaceStatus {

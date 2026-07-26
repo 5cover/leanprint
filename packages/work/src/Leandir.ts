@@ -17,10 +17,12 @@ import type {
     WorkspaceStatus,
 } from './types.js'
 import { InvalidLeandirError, WorkspaceConflictError } from './types.js'
+import assert from 'node:assert'
 
 const WORKSPACE_VERSION = 2 as const
 type StoredEntry = Exclude<EntrySnapshot, { kind: 'missing' | 'special' }>
-type Prepared = { kind: 'file'; bytes: Buffer; mode: number; transformed: boolean } | { kind: 'symlink'; target: string }
+type Prepared =
+    { kind: 'file'; bytes: Buffer; mode: number; transformed: boolean } | { kind: 'symlink'; target: string }
 
 function stored(entry: EntrySnapshot, path: string): StoredEntry {
     if (entry.kind === 'file' || entry.kind === 'symlink') return entry
@@ -46,7 +48,12 @@ async function prepareSource(path: string, source: EntrySnapshot, config: Resolv
     const bytes = await readFile(path)
     const language = configuredLanguage(path, config)
     return language
-        ? { kind: 'file', bytes: Buffer.from(language.leanify(bytes.toString('utf8'), path)), mode: source.mode, transformed: true }
+        ? {
+              kind: 'file',
+              bytes: Buffer.from(language.leanify(bytes.toString('utf8'), path)),
+              mode: source.mode,
+              transformed: true,
+          }
         : { kind: 'file', bytes, mode: source.mode, transformed: false }
 }
 
@@ -57,7 +64,11 @@ function preparedSnapshot(item: Prepared): StoredEntry {
 }
 
 export default class Leandir {
-    static async create(start = process.cwd(), configFilename = 'leanprint.json', force = false): Promise<GeneratedConfig> {
+    static async create(
+        start = process.cwd(),
+        configFilename = 'leanprint.json',
+        force = false
+    ): Promise<GeneratedConfig> {
         const { config, sourceRoot } = await Config.source(start, configFilename)
         const target = config.leandir
         await Config.validateLeandir(sourceRoot, target)
@@ -96,15 +107,22 @@ export default class Leandir {
         return generated
     }
 
-    static async open(start = process.cwd(), filename = 'leanprint.json'): Promise<{ root: string; config: GeneratedConfig }> {
+    static async open(
+        start = process.cwd(),
+        filename = 'leanprint.json'
+    ): Promise<{ root: string; config: GeneratedConfig }> {
         const found = await Config.discover(start, filename)
         const loaded = await Config.load(found.configPath)
-        if (loaded.kind !== 'leandir') throw new InvalidLeandirError(`${found.root} is a source project, not a leandir.`)
+        if (loaded.kind !== 'leandir')
+            throw new InvalidLeandirError(`${found.root} is a source project, not a leandir.`)
         Config.validateWorkspace(loaded.config, found.root)
         return { root: found.root, config: loaded.config }
     }
 
-    private static async context(start: string, filename: string): Promise<{
+    private static async context(
+        start: string,
+        filename: string
+    ): Promise<{
         opened: { root: string; config: GeneratedConfig }
         currentConfig: ResolvedSourceConfig
         context: WorkspaceStatus['context']
@@ -118,7 +136,11 @@ export default class Leandir {
                 throw new InvalidLeandirError(
                     `Source configuration now points to ${source.config.leandir}, not this leandir (${found.root}).`
                 )
-            return { opened: { root: found.root, config: loaded.config }, currentConfig: source.config, context: 'leandir' }
+            return {
+                opened: { root: found.root, config: loaded.config },
+                currentConfig: source.config,
+                context: 'leandir',
+            }
         }
         const source = await Config.source(found.root, filename)
         return {
@@ -179,7 +201,8 @@ export default class Leandir {
                     leanCurrent,
                 }
                 if (leanCurrent.kind === 'special') change.conflict = `leandir entry is ${leanCurrent.entryType}`
-                if (sourceChanged) change.conflict = change.conflict ?? 'path changed in both source project and leandir'
+                if (sourceChanged)
+                    change.conflict = change.conflict ?? 'path changed in both source project and leandir'
                 leandirChanges.push(change)
                 if (change.conflict && !conflicts.some(item => item.path === change.path)) conflicts.push(change)
             }
@@ -215,8 +238,11 @@ export default class Leandir {
         const prepared = new Map<string, Prepared>()
         for (const change of status.sourceChanges) {
             if (change.kind === 'deleted') continue
-            const sourceCurrent = change.sourceCurrent!
-            prepared.set(change.path, await prepareSource(join(status.sourceRoot, change.path), sourceCurrent, currentConfig))
+            const sourceCurrent = change.sourceCurrent
+            prepared.set(
+                change.path,
+                await prepareSource(join(status.sourceRoot, change.path), sourceCurrent, currentConfig)
+            )
         }
         const includedNow = new Set(await collectPaths(status.sourceRoot, currentConfig, filename))
         for (const change of status.sourceChanges) {
@@ -224,20 +250,25 @@ export default class Leandir {
                 ? await snapshot(join(status.sourceRoot, change.path))
                 : { kind: 'missing' as const }
             const leanNow = await snapshot(join(opened.root, change.path))
-            if (!sameSnapshot(change.sourceCurrent!, sourceNow) || !sameSnapshot(change.leanCurrent!, leanNow))
-                throw new WorkspaceConflictError([{ ...change, conflict: 'path changed after update planning' }], 'Update')
+            if (!sameSnapshot(change.sourceCurrent, sourceNow) || !sameSnapshot(change.leanCurrent, leanNow))
+                throw new WorkspaceConflictError(
+                    [{ ...change, conflict: 'path changed after update planning' }],
+                    'Update'
+                )
         }
 
         opened.config.workspace.state = 'updating'
         await saveWorkspace(opened.root, filename, opened.config)
         for (const change of status.sourceChanges) {
             const target = join(opened.root, change.path)
-            if (change.kind === 'deleted') {
+            const item = prepared.get(change.path)
+            assert((change.kind === 'deleted') === (item === undefined))
+            if (item === undefined) {
                 await rm(target, { force: true })
+                // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
                 delete opened.config.workspace.files[change.path]
                 continue
             }
-            const item = prepared.get(change.path)!
             await mkdir(dirname(target), { recursive: true })
             if (item.kind === 'file') await replaceFile(target, item.bytes, item.mode)
             else await replaceSymlink(target, item.target)
@@ -264,21 +295,24 @@ export default class Leandir {
             )
         const status = await this.statusOpened(opened, currentConfig, context, filename)
         if (status.configChanged)
-            throw new InvalidLeandirError('Source configuration changed after the last refresh; run `leanprint update` first.')
+            throw new InvalidLeandirError(
+                'Source configuration changed after the last refresh; run `leanprint update` first.'
+            )
         if (status.conflicts.length) throw new WorkspaceConflictError(status.conflicts)
         if (status.sourceChanges.length)
-            throw new InvalidLeandirError('Source project has changes pending; run `leanprint update` before `leanprint sync`.')
+            throw new InvalidLeandirError(
+                'Source project has changes pending; run `leanprint update` before `leanprint sync`.'
+            )
 
         const prepared = new Map<string, Prepared>()
         for (const change of status.leandirChanges) {
             if (change.kind === 'deleted') continue
             const leanPath = join(opened.root, change.path)
-            const leanCurrent = change.leanCurrent!
-            if (leanCurrent.kind === 'symlink') {
-                prepared.set(change.path, { kind: 'symlink', target: leanCurrent.target })
+            if (change.leanCurrent.kind === 'symlink') {
+                prepared.set(change.path, { kind: 'symlink', target: change.leanCurrent.target })
                 continue
             }
-            if (leanCurrent.kind !== 'file') throw new InvalidLeandirError(`Unsupported entry: ${leanPath}`)
+            if (change.leanCurrent.kind !== 'file') throw new InvalidLeandirError(`Unsupported entry: ${leanPath}`)
             let bytes = await readFile(leanPath)
             const record = opened.config.workspace.files[change.path]
             const language = configuredLanguage(change.path, opened.config)
@@ -297,25 +331,34 @@ export default class Leandir {
                 )
                 language.leanify(bytes.toString('utf8'), change.path)
             }
-            prepared.set(change.path, { kind: 'file', bytes, mode: leanCurrent.mode, transformed: Boolean(language) })
+            prepared.set(change.path, {
+                kind: 'file',
+                bytes,
+                mode: change.leanCurrent.mode,
+                transformed: Boolean(language),
+            })
         }
         for (const change of status.leandirChanges) {
             const current = await snapshot(join(status.sourceRoot, change.path))
-            if (!sameSnapshot(change.sourceExpected!, current))
-                throw new WorkspaceConflictError([{ ...change, conflict: 'source entry changed after synchronization planning' }])
+            if (!sameSnapshot(change.sourceExpected, current))
+                throw new WorkspaceConflictError([
+                    { ...change, conflict: 'source entry changed after synchronization planning' },
+                ])
         }
 
         opened.config.workspace.state = 'applying'
         await saveWorkspace(opened.root, filename, opened.config)
         for (const change of status.leandirChanges) {
             const target = join(status.sourceRoot, change.path)
-            if (change.kind === 'deleted') await rm(target, { force: true })
-            else {
-                const item = prepared.get(change.path)!
-                await mkdir(dirname(target), { recursive: true })
-                if (item.kind === 'file') await replaceFile(target, item.bytes, item.mode)
-                else await replaceSymlink(target, item.target)
+            const item = prepared.get(change.path)
+            assert((change.kind === 'deleted') === (item === undefined))
+            if (item === undefined) {
+                await rm(target, { force: true })
+                continue
             }
+            await mkdir(dirname(target), { recursive: true })
+            if (item.kind === 'file') await replaceFile(target, item.bytes, item.mode)
+            else await replaceSymlink(target, item.target)
         }
         opened.config.workspace.state = 'synchronized'
         await saveWorkspace(opened.root, filename, opened.config)

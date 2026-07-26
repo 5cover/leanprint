@@ -49,7 +49,7 @@ const javascriptFixtures = [
 ]
 
 for (const [index, fixture] of javascriptFixtures.entries()) {
-    test(`preserves JavaScript fixture ${index + 1}`, () => assertEquivalent(fixture, 'fixture.js'))
+    test(`preserves JavaScript fixture ${index + 1}`, () => { assertEquivalent(fixture, 'fixture.js'); })
 }
 
 const precedenceFixtures = [
@@ -67,7 +67,7 @@ const precedenceFixtures = [
 ]
 
 for (const [index, fixture] of precedenceFixtures.entries()) {
-    test(`preserves precedence fixture ${index + 1}`, () => assertEquivalent(fixture, 'precedence.js'))
+    test(`preserves precedence fixture ${index + 1}`, () => { assertEquivalent(fixture, 'precedence.js'); })
 }
 
 test('preserves every pair of binary operator precedence levels', () => {
@@ -124,7 +124,7 @@ test('does not assemble legacy HTML comments from expression tokens', () => {
 
 const typescriptFixtures = [
     `type Pair<T extends object={}>=[first:T,second?:T,...rest:T[]]`,
-    `type Result<T>=T extends string?{readonly [K in keyof T as \`x${'${K & string}'}\`]?:T[K]}:never`,
+    `type Result<T>=T extends string?{readonly [K in keyof T as \`x\${K & string}\`]?:T[K]}:never`,
     `type Factory=abstract new<T>(value:T)=>T`,
     `interface Service<T>{readonly [key:string]:T;get value():T;method?<U>(value:U):value is U;new():Service<T>}`,
     `const value=<Result<string>>input;const checked=input satisfies Result<string>;const fn=identity<string>`,
@@ -139,7 +139,7 @@ const typescriptFixtures = [
 ]
 
 for (const [index, fixture] of typescriptFixtures.entries()) {
-    test(`preserves TypeScript fixture ${index + 1}`, () => assertEquivalent(fixture, 'fixture.ts'))
+    test(`preserves TypeScript fixture ${index + 1}`, () => { assertEquivalent(fixture, 'fixture.ts'); })
 }
 
 test('preserves comment text and order', () => {

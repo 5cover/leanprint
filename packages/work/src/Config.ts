@@ -12,14 +12,12 @@ import { InvalidConfigError, InvalidLeandirError } from './types.js'
 const ajv = new Ajv2020({ allErrors: true, useDefaults: true, coerceTypes: false, removeAdditional: false })
 ajv.addSchema(ecmascriptConfigSchema)
 ajv.addSchema(sourceSchema)
-const validateSource: ValidateFunction<SourceConfig> = ajv.getSchema(sourceSchema.$id)!
+const validateSource: ValidateFunction<SourceConfig> = ajv.compile(sourceSchema)
 const validateGenerated: ValidateFunction<AuthoredGeneratedConfig> = ajv.compile(generatedSchema)
 
 function describe(errors: ErrorObject[] | null | undefined): string {
     return (errors ?? []).map(error => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`).join('; ')
 }
-
-const DEFAULT_IGNORE = ['.git/**', 'node_modules/**', 'dist/**', 'coverage/**']
 
 function resolveLanguages(config: SourceConfig, rules: string[]): ResolvedSourceConfig {
     const languages: ResolvedSourceConfig['languages'] = {}
@@ -34,12 +32,12 @@ function resolveLanguages(config: SourceConfig, rules: string[]): ResolvedSource
         ignore: rules,
         languages,
     }
-    if (humanFormatter) resolved.humanFormatter = { command: humanFormatter.command, args: humanFormatter.args! }
+    if (humanFormatter) resolved.humanFormatter = { command: humanFormatter.command, args: humanFormatter.args ?? [] }
     return resolved
 }
 
-export default class Config {
-    private static async resolveSource(config: SourceConfig, path: string): Promise<ResolvedSourceConfig> {
+const Config = {
+    async resolveSource(config: SourceConfig, path: string): Promise<ResolvedSourceConfig> {
         const filenames = config.ignoreFile
             ? Array.isArray(config.ignoreFile)
                 ? config.ignoreFile
@@ -58,11 +56,10 @@ export default class Config {
             }
         }
         if (config.ignore) rules.push(...config.ignore)
-        if (!config.ignoreFile && !config.ignore) rules.push(...DEFAULT_IGNORE)
         return resolveLanguages(config, rules)
-    }
+    },
 
-    static async discover(
+    async discover(
         start = process.cwd(),
         configFilename = 'leanprint.json'
     ): Promise<{ configPath: string; root: string }> {
@@ -88,9 +85,9 @@ export default class Config {
                 throw new InvalidConfigError(`No config file "${configFilename}" found from ${start}.`)
             current = parent
         }
-    }
+    },
 
-    static async load(path: string): Promise<LoadedConfig> {
+    async load(path: string): Promise<LoadedConfig> {
         let parsed: unknown
         try {
             parsed = JSON.parse(await readFile(path, 'utf8'))
@@ -108,9 +105,9 @@ export default class Config {
             throw new InvalidConfigError(`Invalid config file ${path}: ${describe(validateSource.errors)}.`)
         const resolved = await this.resolveSource(parsed, path)
         return { kind: 'source', config: resolved }
-    }
+    },
 
-    static async source(
+    async source(
         start: string,
         filename: string
     ): Promise<{ config: ResolvedSourceConfig; configPath: string; sourceRoot: string }> {
@@ -133,18 +130,18 @@ export default class Config {
             configPath: found.configPath,
             sourceRoot: found.root,
         }
-    }
+    },
 
-    static integrity(metadata: Omit<WorkspaceMetadata, 'integrity'>): string {
+    integrity(metadata: Omit<WorkspaceMetadata, 'integrity'>): string {
         return hash(stableJson(metadata))
-    }
+    },
 
-    static resolvedHash(config: ResolvedSourceConfig): string {
+    resolvedHash(config: ResolvedSourceConfig): string {
         const { workspace: _workspace, ...resolved } = config
         return hash(stableJson(resolved))
-    }
+    },
 
-    static validateWorkspace(config: GeneratedConfig, root: string): void {
+    validateWorkspace(config: GeneratedConfig, root: string): void {
         const workspace = config.workspace
         if (resolve(workspace.leandir) !== resolve(root))
             throw new InvalidLeandirError(`Invalid workspace metadata in ${root}.`)
@@ -153,14 +150,15 @@ export default class Config {
         const { integrity, ...unsigned } = workspace
         if (integrity !== this.integrity(unsigned))
             throw new InvalidLeandirError(`Workspace metadata integrity check failed in ${root}.`)
-    }
+    },
 
-    static async validateLeandir(sourceRoot: string, leandir: string): Promise<void> {
+    async validateLeandir(sourceRoot: string, leandir: string): Promise<void> {
         const source = await realpath(sourceRoot)
         const target = await realpath(dirname(leandir))
-            .then(parent => resolve(parent, leandir.split(/[\\/]/).at(-1)!))
+            .then(parent => resolve(parent, leandir.split(/[\\/]/).at(-1) ?? ''))
             .catch(() => resolve(leandir))
         if (target === source || target.startsWith(`${source}/`) || source.startsWith(`${target}/`))
             throw new InvalidConfigError('The leandir must be outside, and not an ancestor of, the source root.')
-    }
+    },
 }
+export default Config

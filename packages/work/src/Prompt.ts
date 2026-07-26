@@ -14,9 +14,9 @@ export default class Prompt {
                 `For ECMAScript-family files, use ${source.indent === 2 ? 'two-space' : `${String(source.indent)}-space`} indentation.`
             )
             parts.push('Do not wrap lines based on length.')
-            if (tokens.semicolons === false) parts.push('Omit optional semicolons.')
+            if (!tokens.semicolons) parts.push('Omit optional semicolons.')
             parts.push('Omit trailing commas.')
-            if (source.spaceAroundOperators === false && source.spaceAfterControlKeywords === false)
+            if (!source.spaceAroundOperators && !source.spaceAfterControlKeywords)
                 parts.push(
                     'Omit optional horizontal whitespace, including spaces around operators and after control-flow keywords.'
                 )

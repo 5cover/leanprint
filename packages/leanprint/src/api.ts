@@ -32,7 +32,7 @@ addLanguage(ecmascript)
 
 export const defineLanguage = <L extends AnyLanguage>(language: L): L => language
 
-export function registerLanguage<L extends AnyLanguage>(language: L): void {
+export function registerLanguage(language: AnyLanguage): void {
     addLanguage(language)
 }
 

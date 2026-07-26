@@ -17,13 +17,15 @@ test('formats the documented TypeScript example deterministically', () => {
     )
     assert.equal(format(output, { filepath: 'example.ts' }), output)
 })
-test('uses an explicit, strongly typed language object', () =>
-    assert.equal(format('const value = 1;', { language: ecmascript }), 'const value=1\n'))
-test('retains configured semicolons', () =>
+test('uses an explicit, strongly typed language object', () => {
+    assert.equal(format('const value = 1;', { language: ecmascript }), 'const value=1\n')
+})
+test('retains configured semicolons', () => {
     assert.equal(
         format('const value = 1;', { language: ecmascript, filepath: 'x.js', tokens: { semicolons: true } }),
         'const value=1;\n'
-    ))
+    )
+})
 test('validates options through the language schema without mutating callers', () => {
     const source = { indent: 4 }
     assert.equal(format('if(ok){work()}', { language: ecmascript, filepath: 'x.js', source }), 'if(ok)work()\n')
@@ -33,18 +35,20 @@ test('validates options through the language schema without mutating callers', (
         InvalidConfigError
     )
 })
-test('rejects unknown extensions', () =>
-    assert.throws(() => format('x', { filepath: 'x.py' }), UnsupportedLanguageError))
+test('rejects unknown extensions', () => {
+    assert.throws(() => format('x', { filepath: 'x.py' }), UnsupportedLanguageError)
+})
 test('rejects duplicate language identifiers and extension ownership', () => {
-    assert.throws(() => registerLanguage(ecmascript), /already registered/u)
-    assert.throws(
-        () => registerLanguage({ ...ecmascript, id: 'duplicate-extension', extensions: Object.freeze(['.JS']) }),
-        /already registered by language/u
-    )
+    assert.throws(() => {
+        registerLanguage(ecmascript)
+    }, /already registered/u)
+    assert.throws(() => {
+        registerLanguage({ ...ecmascript, id: 'duplicate-extension', extensions: Object.freeze(['.JS']) })
+    }, /already registered by language/u)
 })
 test('fails explicitly for unknown AST nodes', () => {
     const ast = ecmascript.parser.parse('value', { sourceType: 'unambiguous', filepath: 'x.js' })
-    Object.assign(ast.program.body[0]!, { type: 'UnknownTestNode' })
+    Object.assign(ast.program.body[0] ?? {}, { type: 'UnknownTestNode' })
     assert.throws(
         () => [...ecmascript.tokenPrinter.print(ast, { ...ecmascript.defaults.tokens, filepath: 'x.js' })],
         UnsupportedNodeError

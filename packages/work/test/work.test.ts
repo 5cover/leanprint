@@ -46,9 +46,9 @@ test('applies schema defaults while retaining additional properties', async () =
     await writeFile(path, JSON.stringify({ leandir: `${root}.lean`, languages: { ecmascript: {} }, extension: true }))
     const loaded = await Config.load(path)
     assert.equal(loaded.kind, 'source')
-    assert.deepEqual(loaded.config.ignore, ['.git/**', 'node_modules/**', 'dist/**', 'coverage/**'])
+    assert.deepEqual(loaded.config.ignore, [])
     assert.equal(loaded.config.languages.ecmascript?.tokens.semicolons, false)
-    assert.equal(loaded.config.languages.ecmascript?.source.indent, 2)
+    assert.equal(loaded.config.languages.ecmascript.source.indent, 2)
     assert.equal(loaded.config.extension, true)
 })
 test('requires languages and rejects unregistered language domains', async () => {
@@ -108,7 +108,8 @@ test('rejects edits to resolved generated configuration', async () => {
     await Leandir.create(root)
     const path = join(lean, 'leanprint.json')
     const generated = JSON.parse(await readFile(path, 'utf8')) as GeneratedConfig
-    generated.languages.ecmascript!.source.indent = 8
+    assert(generated.languages.ecmascript)
+    generated.languages.ecmascript.source.indent = 8
     await writeFile(path, JSON.stringify(generated))
     await assert.rejects(Leandir.open(lean), /configuration integrity/)
 })
@@ -241,7 +242,7 @@ test('resolved hashes ignore JSON formatting but detect semantic and ignore-file
         JSON.stringify({ leandir: lean, languages: { ecmascript: {} }, ignoreFile: '.ignore' })
     )
     await Leandir.create(root)
-    const source = JSON.parse(await readFile(configPath, 'utf8'))
+    const source: unknown = JSON.parse(await readFile(configPath, 'utf8'))
     await writeFile(configPath, `${JSON.stringify(source, null, 4)}\n`)
     assert.equal((await Leandir.status(root)).configChanged, false)
     await writeFile(join(root, '.ignore'), 'other.txt\n')

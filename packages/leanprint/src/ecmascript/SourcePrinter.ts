@@ -49,7 +49,7 @@ export default class SourcePrinter implements Contract<Token, EcmascriptSourceCo
             eol = config.lineEnding === 'crlf' ? '\r\n' : '\n'
         let out = '',
             indent = 0,
-            lineStart = true,
+            lineStart = true as boolean, // type assertion prevents @typescript-eslint/no-unnecessary-condition false positive
             previous: ConcreteToken | undefined,
             pendingLine = false,
             pendingBoundary: undefined | 'normal' | 'required'
@@ -66,8 +66,7 @@ export default class SourcePrinter implements Contract<Token, EcmascriptSourceCo
             }
             out += value
         }
-        for (let i = 0; i < tokens.length; i++) {
-            const token = tokens[i]!
+        for (const token of tokens) {
             if (token.type === 'indent') {
                 indent++
                 continue
@@ -85,7 +84,7 @@ export default class SourcePrinter implements Contract<Token, EcmascriptSourceCo
                 pendingBoundary = token.mode
                 continue
             }
-            const concrete = token as ConcreteToken
+            const concrete = token
             if (pendingBoundary) {
                 const defensive =
                     pendingBoundary === 'required' || config.semicolons === true || hazardousStarts.has(concrete.type)

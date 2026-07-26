@@ -1,10 +1,9 @@
 import { parse, type ParseResult, type ParserOptions } from '@babel/parser'
-import type { File } from '@babel/types'
 import { ParseError } from '../errors.js'
 import type { Parser as ParserContract } from '../types.js'
 import type { EcmascriptParserConfig } from './types.js'
-export default class Parser implements ParserContract<ParseResult<File>, EcmascriptParserConfig> {
-    parse(source: string, config: EcmascriptParserConfig): ParseResult<File> {
+export default class Parser implements ParserContract<ParseResult, EcmascriptParserConfig> {
+    parse(source: string, config: EcmascriptParserConfig): ParseResult {
         const path = config.filepath ?? 'input.js',
             lower = path.toLowerCase(),
             ts = /\.(?:ts|tsx|mts|cts)$/.test(lower),

@@ -107,7 +107,7 @@ export type FixedTokenType =
     | 'super'
     | 'import'
     | 'export'
-    | 'default'
+     
     | 'from'
     | 'as'
     | 'satisfies'

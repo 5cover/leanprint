@@ -11,8 +11,8 @@ export default class Formatter {
             )
             let stdout = '',
                 stderr = ''
-            child.stdout.setEncoding('utf8').on('data', chunk => (stdout += chunk))
-            child.stderr.setEncoding('utf8').on('data', chunk => (stderr += chunk))
+            child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk))
+            child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk))
             child.on('error', error =>
                 reject(new FormatterError(`Could not run human formatter ${config.command}: ${error.message}`))
             )
