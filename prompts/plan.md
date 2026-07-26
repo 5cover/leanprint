@@ -929,7 +929,6 @@ Suggested root scripts:
 
 ```json
 {
-  "private": true,
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
