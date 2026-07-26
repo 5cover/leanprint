@@ -5,7 +5,7 @@ import { resolveEcmascriptConfig } from './config.js'
 const defaults = resolveEcmascriptConfig()
 export const ecmascript = {
     id: 'ecmascript',
-    extensions: ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts'],
+    extensions: Object.freeze(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']),
     parser: new Parser(),
     tokenPrinter: new TokenPrinter(),
     sourcePrinter: new SourcePrinter(),
@@ -18,4 +18,5 @@ export const ecmascript = {
 export * from './tokens.js'
 export * from './types.js'
 export * from './parentheses.js'
+export * from './lexical.js'
 export { ecmascriptConfigSchema, resolveEcmascriptConfig } from './config.js'

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import SourcePrinter, { requiredSeparator } from '../src/ecmascript/SourcePrinter.js'
+import SourcePrinter from '../src/ecmascript/SourcePrinter.js'
+import { requiredSeparator } from '../src/ecmascript/lexical.js'
 import { isSymbolToken, isVirtualToken, isWordToken, symbolTokenTypes, type Token } from '../src/ecmascript/tokens.js'
 test('classifies typed tokens', () => {
     assert.equal(isWordToken({ type: 'ident', value: 'x' }), true)
@@ -37,8 +38,6 @@ test('source printer consumes only tokens', () => {
     assert.equal(
         new SourcePrinter().print(tokens, {
             indent: 2,
-            lineWrapping: false,
-            maxEmptyLines: 1,
             spaceAroundOperators: false,
             spaceAfterControlKeywords: false,
             lineEnding: 'lf',

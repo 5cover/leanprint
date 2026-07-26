@@ -28,9 +28,7 @@
       "additionalProperties": true,
       "properties": {
         "semicolons": { "type": "boolean", "default": false },
-        "trailingCommas": { "type": "boolean", "default": false },
-        "collapseSingleStatementBlocks": { "type": "boolean", "default": true },
-        "parentheses": { "const": "required-only", "default": "required-only" }
+        "collapseSingleStatementBlocks": { "type": "boolean", "default": true }
       }
     },
     "source": {
@@ -39,8 +37,6 @@
       "additionalProperties": true,
       "properties": {
         "indent": { "type": "integer", "minimum": 0, "default": 2 },
-        "lineWrapping": { "type": "boolean", "default": false },
-        "maxEmptyLines": { "type": "integer", "minimum": 0, "default": 1 },
         "spaceAroundOperators": { "type": "boolean", "default": false },
         "spaceAfterControlKeywords": { "type": "boolean", "default": false },
         "lineEnding": { "type": "string", "enum": ["lf", "crlf"], "default": "lf" }

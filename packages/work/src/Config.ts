@@ -1,23 +1,22 @@
 import { readFile, realpath } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
-import { Ajv2020, type ErrorObject } from 'ajv/dist/2020.js'
+import { Ajv2020, type ErrorObject, type ValidateFunction } from 'ajv/dist/2020.js'
 import { ecmascriptConfigSchema, getLanguage } from 'leanprint'
 import { hash, stableJson } from './hash.js'
 import generatedSchema from './schemas/GeneratedConfig.json' with { type: 'json' }
 import sourceSchema from './schemas/SourceConfig.json' with { type: 'json' }
-import type { GeneratedConfig, ResolvedSourceConfig, SourceConfig, WorkspaceMetadata } from './types.js'
+import type { GeneratedConfig as AuthoredGeneratedConfig } from './schemas/GeneratedConfig.generated.js'
+import type { GeneratedConfig, LoadedConfig, ResolvedSourceConfig, SourceConfig, WorkspaceMetadata } from './types.js'
 import { InvalidConfigError, InvalidLeandirError } from './types.js'
 
 const ajv = new Ajv2020({ allErrors: true, useDefaults: true, coerceTypes: false, removeAdditional: false })
 ajv.addSchema(ecmascriptConfigSchema)
 ajv.addSchema(sourceSchema)
-const validateSource = ajv.getSchema(sourceSchema.$id)!
-const validateGenerated = ajv.compile(generatedSchema)
+const validateSource: ValidateFunction<SourceConfig> = ajv.getSchema(sourceSchema.$id)!
+const validateGenerated: ValidateFunction<AuthoredGeneratedConfig> = ajv.compile(generatedSchema)
 
 function describe(errors: ErrorObject[] | null | undefined): string {
-    return (errors ?? [])
-        .map(error => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`)
-        .join('; ')
+    return (errors ?? []).map(error => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`).join('; ')
 }
 
 function resolveLanguages(config: SourceConfig): ResolvedSourceConfig {
@@ -38,9 +37,6 @@ function resolveLanguages(config: SourceConfig): ResolvedSourceConfig {
 }
 
 export default class Config {
-    static isGenerated(config: ResolvedSourceConfig | GeneratedConfig): config is GeneratedConfig {
-        return 'workspace' in config && Boolean(config.workspace)
-    }
     static async discover(
         start = process.cwd(),
         configFilename = 'leanprint.json'
@@ -69,7 +65,7 @@ export default class Config {
         }
     }
 
-    static async load(path: string): Promise<ResolvedSourceConfig | GeneratedConfig> {
+    static async load(path: string): Promise<LoadedConfig> {
         let parsed: unknown
         try {
             parsed = JSON.parse(await readFile(path, 'utf8'))
@@ -77,10 +73,16 @@ export default class Config {
             throw new InvalidConfigError(`Could not read config file ${path}: ${(error as Error).message}`)
         }
         const generated = Boolean(parsed && typeof parsed === 'object' && 'workspace' in parsed)
-        const validate = generated ? validateGenerated : validateSource
-        if (!validate(parsed)) throw new InvalidConfigError(`Invalid config file ${path}: ${describe(validate.errors)}.`)
-        const resolved = resolveLanguages(parsed as SourceConfig)
-        return generated ? ({ ...resolved, workspace: (parsed as GeneratedConfig).workspace } as GeneratedConfig) : resolved
+        if (generated) {
+            if (!validateGenerated(parsed))
+                throw new InvalidConfigError(`Invalid config file ${path}: ${describe(validateGenerated.errors)}.`)
+            const resolved = resolveLanguages(parsed)
+            return { kind: 'leandir', config: { ...resolved, workspace: parsed.workspace } }
+        }
+        if (!validateSource(parsed))
+            throw new InvalidConfigError(`Invalid config file ${path}: ${describe(validateSource.errors)}.`)
+        const resolved = resolveLanguages(parsed)
+        return { kind: 'source', config: resolved }
     }
 
     static async source(
@@ -89,15 +91,15 @@ export default class Config {
     ): Promise<{ config: ResolvedSourceConfig; configPath: string; sourceRoot: string }> {
         const found = await this.discover(start, filename)
         const loaded = await this.load(found.configPath)
-        if (this.isGenerated(loaded)) {
-            this.validateWorkspace(loaded, found.root)
-            const sourceFound = await this.discover(loaded.workspace.sourceRoot, filename)
+        if (loaded.kind === 'leandir') {
+            this.validateWorkspace(loaded.config, found.root)
+            const sourceFound = await this.discover(loaded.config.workspace.sourceRoot, filename)
             const source = await this.load(sourceFound.configPath)
-            if (this.isGenerated(source))
+            if (source.kind === 'leandir')
                 throw new InvalidConfigError(`Expected a source config file at ${sourceFound.configPath}.`)
-            return { config: source, configPath: sourceFound.configPath, sourceRoot: sourceFound.root }
+            return { config: source.config, configPath: sourceFound.configPath, sourceRoot: sourceFound.root }
         }
-        return { config: loaded, configPath: found.configPath, sourceRoot: found.root }
+        return { config: loaded.config, configPath: found.configPath, sourceRoot: found.root }
     }
 
     static integrity(metadata: Omit<WorkspaceMetadata, 'integrity'>): string {

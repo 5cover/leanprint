@@ -4,7 +4,7 @@
   "title": "GeneratedConfig",
   "allOf": [
     {
-      "$ref": "./SourceConfig.json"
+      "$ref": "./SourceConfig.json#/$defs/config"
     },
     {
       "type": "object",
@@ -14,6 +14,7 @@
           "additionalProperties": false,
           "required": [
             "schemaVersion",
+            "state",
             "toolVersion",
             "sourceRoot",
             "leandir",
@@ -26,6 +27,7 @@
           ],
           "properties": {
             "schemaVersion": { "const": 1 },
+            "state": { "type": "string", "enum": ["active", "applying", "synchronized"] },
             "toolVersion": { "type": "string" },
             "sourceRoot": { "type": "string" },
             "leandir": { "type": "string" },
@@ -39,14 +41,11 @@
               "additionalProperties": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["kind", "sourceHash", "leanHash", "transformed", "mode"],
+                "required": ["source", "lean", "transformed"],
                 "properties": {
-                  "kind": { "type": "string", "enum": ["file", "symlink"] },
-                  "sourceHash": { "type": "string" },
-                  "leanHash": { "type": "string" },
-                  "transformed": { "type": "boolean" },
-                  "mode": { "type": "integer" },
-                  "target": { "type": "string" }
+                  "source": { "$ref": "#/$defs/entry" },
+                  "lean": { "$ref": "#/$defs/entry" },
+                  "transformed": { "type": "boolean" }
                 }
               }
             }
@@ -55,5 +54,31 @@
       },
       "required": ["workspace"]
     }
-  ]
+  ],
+  "$defs": {
+    "entry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "hash", "mode"],
+          "properties": {
+            "kind": { "const": "file" },
+            "hash": { "type": "string" },
+            "mode": { "type": "integer" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "target", "mode"],
+          "properties": {
+            "kind": { "const": "symlink" },
+            "target": { "type": "string" },
+            "mode": { "type": "integer" }
+          }
+        }
+      ]
+    }
+  }
 }

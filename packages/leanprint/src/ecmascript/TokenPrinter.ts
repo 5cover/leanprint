@@ -23,11 +23,17 @@ function cleanJsxText(value: string): string {
     return result
 }
 export default class TokenPrinter {
-    private config!: EcmascriptTokenConfig;
-    private emittedComments = new Set<string>();
-    *print(file: t.File, config: EcmascriptTokenConfig): Iterable<Token> {
-        this.config = config
-        this.emittedComments.clear()
+    print(file: t.File, config: EcmascriptTokenConfig): Iterable<Token> {
+        return new TokenPrintSession(config).print(file)
+    }
+}
+
+class TokenPrintSession {
+    private readonly emittedComments = new Set<string>()
+
+    constructor(private readonly config: EcmascriptTokenConfig) {}
+
+    *print(file: t.File): Iterable<Token> {
         if (file.program.interpreter) yield { type: 'shebang', value: file.program.interpreter.value }
         yield* this.node(file.program, {})
     }
@@ -51,7 +57,10 @@ export default class TokenPrinter {
             if (index < nodes.length - 1) yield this.fixed(',')
         }
     }
-    private *arrayElements(nodes: readonly (t.Node | null)[], parent: t.ArrayExpression | t.ArrayPattern): Iterable<Token> {
+    private *arrayElements(
+        nodes: readonly (t.Node | null)[],
+        parent: t.ArrayExpression | t.ArrayPattern
+    ): Iterable<Token> {
         for (let index = 0; index < nodes.length; index++) {
             const element = nodes[index]
             if (element) {
@@ -99,9 +108,13 @@ export default class TokenPrinter {
             this.config.collapseSingleStatementBlocks &&
             node.type === 'BlockStatement' &&
             node.body.length === 1 &&
-            ['ExpressionStatement', 'ReturnStatement', 'ThrowStatement', 'BreakStatement', 'ContinueStatement'].includes(
-                node.body[0]!.type
-            ) &&
+            [
+                'ExpressionStatement',
+                'ReturnStatement',
+                'ThrowStatement',
+                'BreakStatement',
+                'ContinueStatement',
+            ].includes(node.body[0]!.type) &&
             !node.body[0]!.leadingComments?.length
         )
     }

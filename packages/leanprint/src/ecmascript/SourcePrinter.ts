@@ -1,6 +1,7 @@
 import type { SourcePrinter as Contract } from '../types.js'
 import type { EcmascriptSourceConfig } from './types.js'
-import { isSymbolToken, isWordToken, symbolTokenTypes, type ConcreteToken, type Token } from './tokens.js'
+import { requiredSeparator, tokenText } from './lexical.js'
+import type { ConcreteToken, Token } from './tokens.js'
 const operatorTypes = new Set([
     '+',
     '-',
@@ -42,45 +43,6 @@ const operatorTypes = new Set([
     'satisfies',
 ])
 const hazardousStarts = new Set(['(', '[', '`', 'regex', '+', '-', '*'])
-const punctuatorsByLength = [...symbolTokenTypes].sort((left, right) => right.length - left.length)
-function text(token: ConcreteToken): string {
-    switch (token.type) {
-        case 'ident':
-        case 'private-ident':
-        case 'number-literal':
-        case 'bigint-literal':
-        case 'string-literal':
-        case 'template-chunk':
-        case 'jsx-text':
-            return token.type === 'private-ident' ? `#${token.value}` : token.value
-        case 'regex':
-            return `/${token.pattern}/${token.flags}`
-        case 'comment':
-            return token.kind === 'line' ? `//${token.value}` : `/*${token.value}*/`
-        case 'shebang':
-            return `#!${token.value}`
-        default:
-            return token.type
-    }
-}
-export function requiredSeparator(previous: ConcreteToken, next: ConcreteToken): '' | ' ' {
-    if (previous.type === 'comment' || previous.type === 'shebang') return ''
-    if (isWordToken(previous) && isWordToken(next)) return ' '
-    if (['return', 'throw', 'yield', 'await', 'new', 'delete', 'void', 'typeof'].includes(previous.type)) return ' '
-    const a = text(previous),
-        b = text(next)
-    if (isSymbolToken(previous)) {
-        const combined = a + b
-        if (punctuatorsByLength.some(punctuator => punctuator.length > a.length && combined.startsWith(punctuator)))
-            return ' '
-    }
-    if (
-        (previous.type === 'number-literal' && next.type === '.') ||
-        (previous.type === '/' && (next.type === '/' || next.type === '*' || next.type === 'regex'))
-    )
-        return ' '
-    return ''
-}
 export default class SourcePrinter implements Contract<Token, EcmascriptSourceConfig> {
     print(input: Iterable<Token>, config: EcmascriptSourceConfig): string {
         const tokens = [...input],
@@ -136,7 +98,8 @@ export default class SourcePrinter implements Contract<Token, EcmascriptSourceCo
                 pendingLine = false
             }
             if (previous) {
-                let separator = requiredSeparator(previous, concrete)
+                const lineStartIndex = Math.max(out.lastIndexOf('\n'), out.lastIndexOf('\r')) + 1
+                let separator = requiredSeparator(previous, concrete, out.slice(lineStartIndex))
                 if (
                     config.spaceAroundOperators &&
                     (operatorTypes.has(previous.type) || operatorTypes.has(concrete.type))
@@ -150,7 +113,7 @@ export default class SourcePrinter implements Contract<Token, EcmascriptSourceCo
                     separator = ' '
                 if (separator) write(separator)
             }
-            write(text(concrete))
+            write(tokenText(concrete))
             if ((concrete.type === 'comment' && concrete.kind === 'line') || concrete.type === 'shebang') newline()
             else previous = concrete
         }

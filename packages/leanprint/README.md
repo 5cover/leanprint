@@ -13,8 +13,8 @@ const lean = format('const answer: number = 42;', {
 // const answer:number=42\n
 ```
 
-`FormatOptions<L>` derives its parser, token, and source option types from the supplied language object. Filepath-only calls remain available for registered extensions. The package also exports `ecmascript`, language registry helpers, generic language contracts, schema-derived ECMAScript types, and typed errors. It performs no filesystem or workflow operations.
+`FormatOptions<L>` derives its parser, token, and source option types from the supplied language object. Filepath-only calls remain available for registered extensions, but typed parser, token, and source overrides require an explicit language so options cannot be paired with the wrong domain. The package also exports `ecmascript`, language registry helpers, generic language contracts, schema-derived ECMAScript types, and typed errors. It performs no filesystem or workflow operations.
 
 ECMAScript configuration defaults and runtime validation are defined by [EcmascriptConfig.json](https://raw.githubusercontent.com/5cover/leanprint/main/packages/leanprint/src/ecmascript/EcmascriptConfig.json). AJV applies defaults to a cloned configuration, so `format()` does not mutate caller-owned options.
 
-The enabled ECMAScript, TypeScript, and JSX Babel node families are supported. Flow and parser proposal plugins not enabled by the ECMAScript domain remain outside its syntax boundary. Unknown future nodes fail with `UnsupportedNodeError`.
+The printer has explicit dispatch for the standardized ECMAScript, TypeScript, and JSX Babel node families enabled by this domain. Behavioral fixtures exercise representative syntax and AST equivalence; the dispatch inventory test is structural and does not substitute for semantic fixtures. Flow and parser proposal plugins not enabled by the ECMAScript domain remain outside its syntax boundary. Unknown future nodes fail with `UnsupportedNodeError`.

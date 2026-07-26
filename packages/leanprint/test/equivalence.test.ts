@@ -27,7 +27,10 @@ function normalize(value: unknown): unknown {
 function assertEquivalent(source: string, filepath: string): void {
     const output = format(source, { filepath })
     const config = { ...ecmascript.defaults.parser, filepath }
-    assert.deepEqual(normalize(ecmascript.parser.parse(output, config)), normalize(ecmascript.parser.parse(source, config)))
+    assert.deepEqual(
+        normalize(ecmascript.parser.parse(output, config)),
+        normalize(ecmascript.parser.parse(source, config))
+    )
     assert.equal(format(output, { filepath }), output)
 }
 
@@ -112,6 +115,11 @@ test('preserves grammar-sensitive call, member, new, and exponentiation operands
         `const value=(await operand)**power`,
     ])
         assertEquivalent(`async function check(){${fixture}}`, 'grammar.js')
+})
+
+test('does not assemble legacy HTML comments from expression tokens', () => {
+    assertEquivalent('a < ! --b', 'legacy-comment.js')
+    assert.notEqual(format('a < ! --b', { filepath: 'legacy-comment.js' }).trim(), 'a<!--b')
 })
 
 const typescriptFixtures = [

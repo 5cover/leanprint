@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdtemp, mkdir, readFile, readlink, symlink, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
@@ -42,10 +42,11 @@ test('applies schema defaults while retaining additional properties', async () =
     const path = join(root, 'leanprint.json')
     await writeFile(path, JSON.stringify({ leandir: `${root}.lean`, languages: { ecmascript: {} }, extension: true }))
     const loaded = await Config.load(path)
-    assert.deepEqual(loaded.ignore, ['.git/**', 'node_modules/**', 'dist/**', 'coverage/**'])
-    assert.equal(loaded.languages.ecmascript?.tokens.semicolons, false)
-    assert.equal(loaded.languages.ecmascript?.source.indent, 2)
-    assert.equal(loaded.extension, true)
+    assert.equal(loaded.kind, 'source')
+    assert.deepEqual(loaded.config.ignore, ['.git/**', 'node_modules/**', 'dist/**', 'coverage/**'])
+    assert.equal(loaded.config.languages.ecmascript?.tokens.semicolons, false)
+    assert.equal(loaded.config.languages.ecmascript?.source.indent, 2)
+    assert.equal(loaded.config.extension, true)
 })
 test('requires languages and rejects unregistered language domains', async () => {
     const { root } = await fixture()
@@ -77,7 +78,27 @@ test('creates, reports edits, and synchronizes a leandir', async () => {
     )
     await Leandir.sync(lean)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer:number=43\n')
-    assert.equal((await Leandir.status(lean)).changes.length, 0)
+    assert.equal((await Leandir.open(lean)).config.workspace.state, 'synchronized')
+    await assert.rejects(Leandir.sync(lean), /state "synchronized"/)
+})
+test('synchronizes symlink, kind, and mode changes without following links', async () => {
+    const { root, lean } = await fixture()
+    await symlink('README.md', join(root, 'link'))
+    await Leandir.create(root)
+
+    await unlink(join(lean, 'link'))
+    await symlink('src/index.ts', join(lean, 'link'))
+    await unlink(join(lean, 'README.md'))
+    await symlink('src/index.ts', join(lean, 'README.md'))
+    await chmod(join(lean, 'src', 'index.ts'), 0o755)
+
+    const status = await Leandir.status(lean)
+    assert.equal(status.conflicts.length, 0)
+    assert.equal(status.changes.length, 3)
+    await Leandir.sync(lean)
+    assert.equal(await readlink(join(root, 'link')), 'src/index.ts')
+    assert.equal(await readlink(join(root, 'README.md')), 'src/index.ts')
+    assert.equal((await lstat(join(root, 'src', 'index.ts'))).mode & 0o777, 0o755)
 })
 test('rejects edits to resolved generated configuration', async () => {
     const { root, lean } = await fixture()
@@ -87,4 +108,39 @@ test('rejects edits to resolved generated configuration', async () => {
     generated.languages.ecmascript!.source.indent = 8
     await writeFile(path, JSON.stringify(generated))
     await assert.rejects(Leandir.open(lean), /configuration integrity/)
+})
+test('reports all concurrent source conflicts before writing', async () => {
+    const { root, lean } = await fixture()
+    await Leandir.create(root)
+    await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
+    await writeFile(join(lean, 'README.md'), 'AI edit\n')
+    await writeFile(join(root, 'src', 'index.ts'), 'export const answer: number = 44;\n')
+    await writeFile(join(root, 'README.md'), 'human edit\n')
+
+    const status = await Leandir.status(lean)
+    assert.equal(status.conflicts.length, 2)
+    await assert.rejects(Leandir.sync(lean), /Synchronization has 2 conflict/)
+    assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 44;\n')
+    assert.equal(await readFile(join(root, 'README.md'), 'utf8'), 'human edit\n')
+    assert.equal((await Leandir.open(lean)).config.workspace.state, 'active')
+})
+test('formatter failure aborts before source-project writes', async () => {
+    const { root, lean } = await fixture()
+    await writeFile(
+        join(root, 'leanprint.json'),
+        JSON.stringify({
+            leandir: lean,
+            languages: { ecmascript: {} },
+            humanFormatter: {
+                command: process.execPath,
+                args: ['-e', "process.stderr.write('formatter failed');process.exit(2)"],
+            },
+        })
+    )
+    await Leandir.create(root)
+    await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
+
+    await assert.rejects(Leandir.sync(lean), /formatter failed/)
+    assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
+    assert.equal((await Leandir.open(lean)).config.workspace.state, 'active')
 })

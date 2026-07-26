@@ -1,24 +1,39 @@
 import { extname } from 'node:path'
 import { UnsupportedLanguageError } from './errors.js'
 import { ecmascript } from './ecmascript/index.js'
-import type { EcmascriptConfig } from './ecmascript/types.js'
 import type { AnyLanguage, FormatOptions } from './types.js'
 
 type EcmascriptFormatOptions = {
     filepath: string
-    language?: typeof ecmascript
-    parser?: NonNullable<EcmascriptConfig['parser']>
-    tokens?: NonNullable<EcmascriptConfig['tokens']>
-    source?: NonNullable<EcmascriptConfig['source']>
+    language?: never
+    parser?: never
+    tokens?: never
+    source?: never
 }
 
-const languages = new Map<string, AnyLanguage>([[ecmascript.id, ecmascript]])
+const languages = new Map<string, AnyLanguage>()
+const languagesByExtension = new Map<string, AnyLanguage>()
+
+function addLanguage(language: AnyLanguage): void {
+    if (languages.has(language.id)) throw new Error(`Language "${language.id}" is already registered.`)
+    for (const extension of language.extensions) {
+        const normalized = extension.toLowerCase()
+        const owner = languagesByExtension.get(normalized)
+        if (owner)
+            throw new Error(
+                `Extension "${normalized}" is already registered by language "${owner.id}" and cannot also belong to "${language.id}".`
+            )
+    }
+    languages.set(language.id, language)
+    for (const extension of language.extensions) languagesByExtension.set(extension.toLowerCase(), language)
+}
+
+addLanguage(ecmascript)
 
 export const defineLanguage = <L extends AnyLanguage>(language: L): L => language
 
 export function registerLanguage<L extends AnyLanguage>(language: L): void {
-    if (languages.has(language.id)) throw new Error(`Language "${language.id}" is already registered.`)
-    languages.set(language.id, language)
+    addLanguage(language)
 }
 
 export function getLanguage(id: string): AnyLanguage | undefined {
@@ -31,13 +46,10 @@ export function getLanguages(): readonly AnyLanguage[] {
 
 export function getLanguageForFilepath(filepath: string): AnyLanguage | undefined {
     const extension = extname(filepath).toLowerCase()
-    return [...languages.values()].find(language => language.extensions.includes(extension))
+    return languagesByExtension.get(extension)
 }
 
-export function format<L extends AnyLanguage>(
-    source: string,
-    options: FormatOptions<L> & { language: L }
-): string
+export function format<L extends AnyLanguage>(source: string, options: FormatOptions<L> & { language: L }): string
 export function format(source: string, options: EcmascriptFormatOptions): string
 export function format(
     source: string,

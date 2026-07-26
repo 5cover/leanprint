@@ -31,7 +31,8 @@ const binaryPrecedence: Record<string, number> = {
 }
 
 function precedence(node: t.Node): number {
-    if (node.type === 'BinaryExpression' || node.type === 'LogicalExpression') return binaryPrecedence[node.operator] ?? 0
+    if (node.type === 'BinaryExpression' || node.type === 'LogicalExpression')
+        return binaryPrecedence[node.operator] ?? 0
     switch (node.type) {
         case 'SequenceExpression':
             return 1

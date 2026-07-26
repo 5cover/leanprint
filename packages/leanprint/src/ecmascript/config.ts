@@ -8,13 +8,12 @@ const validate = ajv.compile(schema)
 export const ecmascriptConfigSchema = schema
 
 function describe(errors: ErrorObject[] | null | undefined): string {
-    return (errors ?? [])
-        .map(error => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`)
-        .join('; ')
+    return (errors ?? []).map(error => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`).join('; ')
 }
 
 export function resolveEcmascriptConfig(input: EcmascriptConfig = {}): ResolvedEcmascriptConfig {
     const config: unknown = structuredClone(input)
-    if (!validate(config)) throw new InvalidConfigError(`Invalid ECMAScript configuration: ${describe(validate.errors)}.`)
+    if (!validate(config))
+        throw new InvalidConfigError(`Invalid ECMAScript configuration: ${describe(validate.errors)}.`)
     return config as ResolvedEcmascriptConfig
 }

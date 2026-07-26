@@ -1,4 +1,8 @@
 import type { ResolvedEcmascriptConfig, ResolvedLanguageConfig } from 'leanprint'
+import type {
+    Entry as StoredEntry,
+    GeneratedConfig as AuthoredGeneratedConfig,
+} from './schemas/GeneratedConfig.generated.js'
 export type { SourceConfig } from './schemas/SourceConfig.generated.js'
 
 export interface HumanFormatterConfig {
@@ -18,40 +22,30 @@ export interface ResolvedSourceConfig {
     [key: string]: unknown
 }
 
-export interface FileRecord {
-    kind: 'file' | 'symlink'
-    sourceHash: string
-    leanHash: string
-    transformed: boolean
-    mode: number
-    target?: string
-}
+export type EntrySnapshot = { kind: 'missing' } | StoredEntry | { kind: 'special'; entryType: string }
 
-export interface WorkspaceMetadata {
-    schemaVersion: 1
-    toolVersion: string
-    sourceRoot: string
-    leandir: string
-    configFilename: string
-    createdAt: string
-    configHash: string
-    resolvedConfigHash: string
-    files: Record<string, FileRecord>
-    integrity: string
-}
+export type WorkspaceMetadata = AuthoredGeneratedConfig['workspace']
+export type FileRecord = WorkspaceMetadata['files'][string]
 
 export interface GeneratedConfig extends ResolvedSourceConfig {
     workspace: WorkspaceMetadata
 }
 
+export type LoadedConfig =
+    { kind: 'source'; config: ResolvedSourceConfig } | { kind: 'leandir'; config: GeneratedConfig }
+
 export interface Change {
     path: string
     kind: 'added' | 'modified' | 'deleted'
     conflict?: string
+    sourceExpected?: EntrySnapshot
+    sourceCurrent?: EntrySnapshot
+    leanCurrent?: EntrySnapshot
 }
 
 export interface WorkspaceStatus {
     context: 'source project' | 'leandir'
+    state: WorkspaceMetadata['state']
     sourceRoot: string
     leandir: string
     changes: Change[]

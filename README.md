@@ -45,7 +45,9 @@ leanprint status
 leanprint sync
 ```
 
-A leandir is a materialized AI-oriented working copy, not a mount, cache, Git worktree, or live mirror. `create` leanifies supported files and copies other files. The generated config file records SHA-256 file state and integrity-protected workspace metadata. `sync` plans all changes first; any concurrent source-project conflict prevents every write. Supported AI source is parsed, passed to the configured human formatter through stdin/stdout, parsed again, and atomically written to the source project.
+A leandir is a materialized AI-oriented working copy, not a mount, cache, Git worktree, or live mirror. `create` leanifies supported files and copies other files. The generated config file records SHA-256 file state and integrity-protected workspace metadata. `sync` plans all changes first; any concurrent source-project conflict prevents every write. Supported AI source is parsed, passed to the configured human formatter through stdin/stdout, parsed again, and atomically written to the source project. A successful sync seals that workspace session; create a new leandir for further AI work.
+
+Each destination entry is replaced atomically, but the MVP does not claim project-wide rollback after an operating-system I/O failure partway through application. The workspace is first marked `applying`; if application fails, it remains in that state and refuses another sync so partial application cannot be mistaken for a clean session.
 
 ## Commands
 
@@ -85,7 +87,7 @@ The default config filename is `leanprint.json`. `-c` accepts a repository-relat
 
 ## Current status and syntax
 
-The ECMAScript domain covers every standardized, TypeScript, and JSX node exposed by the installed Babel AST version for the parser plugins LeanPrint enables. This includes complete statement and control-flow forms, modules and import attributes, explicit resource management, decorators, classes and fields, JSX/TSX, and TypeScript declarations and type syntax.
+The ECMAScript printer has explicit dispatch for every standardized, TypeScript, and JSX node exposed by the installed Babel AST version for the parser plugins LeanPrint enables. This includes statement and control-flow forms, modules and import attributes, explicit resource management, decorators, classes and fields, JSX/TSX, and TypeScript declarations and type syntax. Representative behavioral fixtures verify reparsing and AST equivalence; the complete dispatch inventory is structural coverage rather than a claim that every combination of syntax has an independent semantic fixture.
 
 Flow syntax and experimental proposal families that are not enabled in the parser—such as pipeline, record/tuple, bind, module-expression, and do-expression proposals—are outside the current language domain. If an enabled parser or a future Babel release produces an unknown node, LeanPrint fails explicitly with `UnsupportedNodeError` rather than emitting partial source.
 
@@ -100,3 +102,15 @@ pnpm lint
 ```
 
 The repository uses pnpm workspaces, strict TypeScript, ESM, ESLint, tsup, node:test, Changesets, and GitHub Actions.
+
+## Package and release lifecycle
+
+LeanPrint uses **Changesets** to record release intent and **tsup** to turn the TypeScript sources into npm-ready files.
+
+1. **Develop and verify a change.** Work in `packages/leanprint` or `packages/work`, then run `pnpm ci` and `pnpm lint`.
+2. **Add a changeset.** Run `pnpm changeset`, select the affected package and whether the release is a patch, minor, or major, then write a short user-facing summary. This creates a small Markdown file under `.changeset`; commit it with the code. Because the two packages are configured as a fixed group, Changesets keeps their published versions synchronized.
+3. **Apply release versions.** A release maintainer runs `pnpm version-packages`. Changesets consumes pending changeset files, updates package versions and changelogs, and updates internal dependency ranges. Review and commit those generated changes.
+4. **Build packages.** Run `pnpm build`. Each package invokes tsup, which bundles its ESM entry points into `dist/*.js` and generates matching `dist/*.d.ts` TypeScript declarations. The package manifests publish `dist`, not the original implementation files.
+5. **Publish to npm.** After authenticating with npm and verifying the version commit, run `pnpm release`. This rebuilds both packages and asks Changesets to publish package versions that are not already on the configured npm registry.
+
+In short, a changeset says **what version should change and why**, `version-packages` materializes that decision, tsup creates the distributable files, and `release` publishes them. The root package is private and is never published.

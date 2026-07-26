@@ -2,33 +2,36 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json",
   "title": "SourceConfig",
-  "type": "object",
-  "additionalProperties": true,
-  "required": ["leandir", "languages"],
-  "properties": {
-    "$schema": { "type": "string" },
-    "leandir": { "type": "string", "minLength": 1 },
-    "languages": {
-      "type": "object",
-      "additionalProperties": { "type": "object" },
-      "properties": {
-        "ecmascript": {
-          "$ref": "../../../leanprint/src/ecmascript/EcmascriptConfig.json"
-        }
-      }
-    },
-    "ignore": {
-      "type": "array",
-      "items": { "type": "string" },
-      "default": [".git/**", "node_modules/**", "dist/**", "coverage/**"]
-    },
-    "humanFormatter": {
+  "allOf": [{ "$ref": "#/$defs/config" }, { "not": { "type": "object", "required": ["workspace"] } }],
+  "$defs": {
+    "config": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["command"],
+      "required": ["leandir", "languages"],
       "properties": {
-        "command": { "type": "string", "minLength": 1 },
-        "args": { "type": "array", "items": { "type": "string" }, "default": [] }
+        "$schema": { "type": "string" },
+        "leandir": { "type": "string", "minLength": 1 },
+        "languages": {
+          "type": "object",
+          "additionalProperties": { "type": "object" },
+          "properties": {
+            "ecmascript": { "$ref": "../../../leanprint/src/ecmascript/EcmascriptConfig.json" }
+          }
+        },
+        "ignore": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [".git/**", "node_modules/**", "dist/**", "coverage/**"]
+        },
+        "humanFormatter": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["command"],
+          "properties": {
+            "command": { "type": "string", "minLength": 1 },
+            "args": { "type": "array", "items": { "type": "string" }, "default": [] }
+          }
+        }
       }
     }
   }

@@ -35,12 +35,10 @@ export interface Language<
 }
 export type AnyLanguage = Language<unknown, unknown, LanguageConfig, ResolvedLanguageConfig, object>
 export type Defined<T> = Exclude<T, undefined>
-export type LanguageConfigOf<L> = L extends Language<infer _Ast, infer _Token, infer Config, infer _Resolved, infer _Source>
-    ? Config
-    : never
-export type ResolvedConfigOf<L> = L extends Language<infer _Ast, infer _Token, infer _Config, infer Resolved, infer _Source>
-    ? Resolved
-    : never
+export type LanguageConfigOf<L> =
+    L extends Language<infer _Ast, infer _Token, infer Config, infer _Resolved, infer _Source> ? Config : never
+export type ResolvedConfigOf<L> =
+    L extends Language<infer _Ast, infer _Token, infer _Config, infer Resolved, infer _Source> ? Resolved : never
 export type ParserConfigOf<L> = Defined<LanguageConfigOf<L>['parser']>
 export type TokenConfigOf<L> = Defined<LanguageConfigOf<L>['tokens']>
 export type SourceConfigOf<L> = Defined<LanguageConfigOf<L>['source']>

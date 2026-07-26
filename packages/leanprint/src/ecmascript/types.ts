@@ -9,15 +9,11 @@ export interface EcmascriptParserConfig extends EcmascriptParserOptions {
 }
 export interface EcmascriptTokenConfig extends EcmascriptTokenOptions {
     semicolons: boolean
-    trailingCommas: boolean
     collapseSingleStatementBlocks: boolean
-    parentheses: 'required-only'
     filepath?: string
 }
 export interface EcmascriptSourceConfig extends EcmascriptSourceOptions {
     indent: number
-    lineWrapping: boolean
-    maxEmptyLines: number
     spaceAroundOperators: boolean
     spaceAfterControlKeywords: boolean
     lineEnding: 'lf' | 'crlf'
@@ -30,14 +26,10 @@ export interface ResolvedEcmascriptConfig {
     }
     tokens: EcmascriptTokenOptions & {
         semicolons: boolean
-        trailingCommas: boolean
         collapseSingleStatementBlocks: boolean
-        parentheses: 'required-only'
     }
     source: EcmascriptSourceOptions & {
         indent: number
-        lineWrapping: boolean
-        maxEmptyLines: number
         spaceAroundOperators: boolean
         spaceAfterControlKeywords: boolean
         lineEnding: 'lf' | 'crlf'

@@ -7,7 +7,7 @@ import { format, getLanguage } from 'leanprint'
 import Config from './Config.js'
 import Leandir from './Leandir.js'
 import Prompt from './Prompt.js'
-import { atomicWrite } from './filesystem.js'
+import { replaceFile } from './filesystem.js'
 import Stats from './stats/Stats.js'
 const program = new Command()
     .name('leanprint')
@@ -25,7 +25,7 @@ program
             language = options.language ? getLanguage(options.language) : undefined
         if (options.language && !language) throw new Error(`Language "${options.language}" is not registered.`)
         const output = language ? format(source, { filepath: path, language }) : format(source, { filepath: path })
-        if (options.write) await atomicWrite(path, output)
+        if (options.write) await replaceFile(path, output)
         else process.stdout.write(output)
     })
 program
@@ -49,9 +49,9 @@ program
     .action(async path => {
         const found = await Config.discover(path, program.opts().config),
             loaded = await Config.load(found.configPath),
-            inLeandir = Config.isGenerated(loaded)
-        if (inLeandir) Config.validateWorkspace(loaded, found.root)
-        process.stdout.write(Prompt.generate(loaded, inLeandir))
+            inLeandir = loaded.kind === 'leandir'
+        if (loaded.kind === 'leandir') Config.validateWorkspace(loaded.config, found.root)
+        process.stdout.write(Prompt.generate(loaded.config, inLeandir))
     })
 program
     .command('status')
@@ -60,7 +60,7 @@ program
         const status = await Leandir.status(path, program.opts().config),
             counts = (kind: string) => status.changes.filter(c => c.kind === kind).length
         process.stdout.write(
-            `Context: ${status.context}\nSource root: ${status.sourceRoot}\nLeandir: ${status.leandir}\nChanged files: ${counts('modified')}\nAdded files: ${counts('added')}\nDeleted files: ${counts('deleted')}\nConflicts: ${status.conflicts.length}\n`
+            `Context: ${status.context}\nState: ${status.state}\nSource root: ${status.sourceRoot}\nLeandir: ${status.leandir}\nChanged files: ${counts('modified')}\nAdded files: ${counts('added')}\nDeleted files: ${counts('deleted')}\nConflicts: ${status.conflicts.length}\n`
         )
         for (const conflict of status.conflicts) process.stdout.write(`- ${conflict.path}: ${conflict.conflict}\n`)
     })
@@ -69,13 +69,12 @@ program
     .argument('[path]', 'project or leandir path', process.cwd())
     .option('--force')
     .action(async (path, options) => {
-        let opened
-        try {
-            opened = await Leandir.open(path, program.opts().config)
-        } catch {
-            const source = await Config.source(path, program.opts().config)
-            opened = await Leandir.open(resolve(source.sourceRoot, source.config.leandir), program.opts().config)
-        }
+        const found = await Config.discover(path, program.opts().config),
+            loaded = await Config.load(found.configPath),
+            opened =
+                loaded.kind === 'leandir'
+                    ? await Leandir.open(found.root, program.opts().config)
+                    : await Leandir.open(resolve(found.root, loaded.config.leandir), program.opts().config)
         if (!options.force) {
             if (!process.stdin.isTTY)
                 throw new Error('Confirmation required; use --force in non-interactive environments.')

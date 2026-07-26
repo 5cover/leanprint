@@ -13,19 +13,17 @@ export default class Prompt {
             parts.push(
                 `For ECMAScript-family files, use ${source.indent === 2 ? 'two-space' : `${String(source.indent)}-space`} indentation.`
             )
-            if (source.lineWrapping === false) parts.push('Do not wrap lines based on length.')
+            parts.push('Do not wrap lines based on length.')
             if (tokens.semicolons === false) parts.push('Omit optional semicolons.')
-            if (tokens.trailingCommas === false) parts.push('Omit trailing commas.')
+            parts.push('Omit trailing commas.')
             if (source.spaceAroundOperators === false && source.spaceAfterControlKeywords === false)
                 parts.push(
                     'Omit optional horizontal whitespace, including spaces around operators and after control-flow keywords.'
                 )
             parts.push(
-                `Keep at most ${String(source.maxEmptyLines)} consecutive empty line${source.maxEmptyLines === 1 ? '' : 's'}.`,
-                'Preserve spaces required to prevent lexical tokens from merging.'
+                'Preserve spaces required to prevent lexical tokens from merging.',
+                'Emit parentheses only when required to preserve syntax and expression structure.'
             )
-            if (tokens.parentheses === 'required-only')
-                parts.push('Emit parentheses only when required to preserve syntax and expression structure.')
             if (tokens.collapseSingleStatementBlocks)
                 parts.push('Simple single-statement control-flow bodies may remain collapsed.')
             parts.push('Keep comments and valid language syntax.')
