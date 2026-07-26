@@ -14,8 +14,8 @@ function cleanJsxText(value: string): string {
     let result = ''
     i = 0
     for (let line of lines) {
-        if (i !== 0) line = line.trimStart()
-        if (i !== lines.length - 1) line = line.trimEnd()
+        if (i !== 0) line = line.replace(/[^\S ]\s+/gu, ' ')
+        if (i !== lines.length - 1) line = line.replace(/ +$/u, '')
         if (line) {
             if (i !== lastNonEmptyLine) line += ' '
             result += line
