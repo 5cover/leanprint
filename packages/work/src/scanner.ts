@@ -1,6 +1,7 @@
 import { lstat, readFile, readlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { glob } from 'glob'
+import ignore from 'ignore'
 import { compareStrings, hash, stableJson } from './hash.js'
 import type { EntrySnapshot, ResolvedSourceConfig } from './types.js'
 
@@ -39,8 +40,24 @@ export async function collectPaths(
     configFilename: string
 ): Promise<string[]> {
     const normalizedConfig = configFilename.replaceAll('\\', '/')
-    return (await glob('**/*', { cwd: root, dot: true, nodir: true, follow: false, ignore: config.ignore }))
-        .filter(path => path !== normalizedConfig)
+    const matcher = ignore()
+    for (const rules of config.ignore) matcher.add(rules)
+    return (
+        await glob('**/*', {
+            cwd: root,
+            dot: true,
+            nodir: true,
+            follow: false,
+            ignore: {
+                childrenIgnored(path) {
+                    const relative = path.relative().replaceAll('\\', '/')
+                    return Boolean(relative) && matcher.ignores(`${relative}/`)
+                },
+            },
+        })
+    )
+        .map(path => path.replaceAll('\\', '/'))
+        .filter(path => path !== normalizedConfig && !matcher.ignores(path))
         .sort(compareStrings)
 }
 

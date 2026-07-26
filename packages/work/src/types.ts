@@ -1,8 +1,5 @@
 import type { ResolvedEcmascriptConfig, ResolvedLanguageConfig } from 'leanprint'
-import type {
-    Entry as StoredEntry,
-    GeneratedConfig as AuthoredGeneratedConfig,
-} from './schemas/GeneratedConfig.generated.js'
+import type { GeneratedConfig as AuthoredGeneratedConfig } from './schemas/GeneratedConfig.generated.js'
 export type { SourceConfig } from './schemas/SourceConfig.generated.js'
 
 export interface HumanFormatterConfig {
@@ -22,10 +19,10 @@ export interface ResolvedSourceConfig {
     [key: string]: unknown
 }
 
-export type EntrySnapshot = { kind: 'missing' } | StoredEntry | { kind: 'special'; entryType: string }
-
 export type WorkspaceMetadata = AuthoredGeneratedConfig['workspace']
 export type FileRecord = WorkspaceMetadata['files'][string]
+type StoredEntry = FileRecord['source']
+export type EntrySnapshot = { kind: 'missing' } | StoredEntry | { kind: 'special'; entryType: string }
 
 export interface GeneratedConfig extends ResolvedSourceConfig {
     workspace: WorkspaceMetadata
@@ -48,6 +45,9 @@ export interface WorkspaceStatus {
     state: WorkspaceMetadata['state']
     sourceRoot: string
     leandir: string
+    sourceChanges: Change[]
+    leandirChanges: Change[]
+    configChanged: boolean
     changes: Change[]
     conflicts: Change[]
 }
@@ -63,9 +63,9 @@ export class LeandirExistsError extends Error {
 }
 export class WorkspaceConflictError extends Error {
     override name = 'WorkspaceConflictError'
-    constructor(public readonly conflicts: Change[]) {
+    constructor(public readonly conflicts: Change[], operation = 'Synchronization') {
         super(
-            `Synchronization has ${conflicts.length} conflict(s):\n${conflicts.map(c => `- ${c.path}: ${c.conflict}`).join('\n')}`
+            `${operation} has ${conflicts.length} conflict(s):\n${conflicts.map(c => `- ${c.path}: ${c.conflict}`).join('\n')}`
         )
     }
 }

@@ -2,20 +2,25 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/5cover/leanprint/main/packages/leanprint/src/ecmascript/EcmascriptConfig.json",
   "title": "EcmascriptConfig",
+  "description": "Parser, token-reduction, and source-rendering settings for JavaScript, JSX, TypeScript, and TSX.",
   "type": "object",
   "additionalProperties": true,
   "properties": {
     "parser": {
+      "title": "Parser settings",
+      "description": "Settings used when parsing source before printing and when validating synchronized output.",
       "type": "object",
       "default": {},
       "additionalProperties": true,
       "properties": {
         "sourceType": {
+          "description": "How Babel interprets scripts and modules.",
           "type": "string",
           "enum": ["unambiguous", "module", "script"],
           "default": "unambiguous"
         },
         "plugins": {
+          "description": "Additional Babel parser plugin names.",
           "type": "array",
           "items": { "type": "string" },
           "default": []
@@ -23,23 +28,27 @@
       }
     },
     "tokens": {
+      "title": "Token settings",
+      "description": "Controls syntax-preserving reductions emitted by the typed token printer.",
       "type": "object",
       "default": {},
       "additionalProperties": true,
       "properties": {
-        "semicolons": { "type": "boolean", "default": false },
-        "collapseSingleStatementBlocks": { "type": "boolean", "default": true }
+        "semicolons": { "type": "boolean", "default": false, "description": "Retain optional semicolons when true." },
+        "collapseSingleStatementBlocks": { "type": "boolean", "default": true, "description": "Remove eligible braces around a single statement when safe." }
       }
     },
     "source": {
+      "title": "Source rendering settings",
+      "description": "Controls whitespace and line endings in lean output.",
       "type": "object",
       "default": {},
       "additionalProperties": true,
       "properties": {
-        "indent": { "type": "integer", "minimum": 0, "default": 2 },
-        "spaceAroundOperators": { "type": "boolean", "default": false },
-        "spaceAfterControlKeywords": { "type": "boolean", "default": false },
-        "lineEnding": { "type": "string", "enum": ["lf", "crlf"], "default": "lf" }
+        "indent": { "type": "integer", "minimum": 0, "default": 2, "description": "Spaces per indentation level.", "examples": [2, 4] },
+        "spaceAroundOperators": { "type": "boolean", "default": false, "description": "Render spaces around operators when true." },
+        "spaceAfterControlKeywords": { "type": "boolean", "default": false, "description": "Render a space after control-flow keywords when true." },
+        "lineEnding": { "type": "string", "enum": ["lf", "crlf"], "default": "lf", "description": "Output line-ending convention." }
       }
     }
   }

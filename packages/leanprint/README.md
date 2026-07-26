@@ -2,6 +2,8 @@
 
 The source-to-source LeanPrint library. It parses ECMAScript-family source with Babel, emits typed language-domain tokens from the AST, and renders deterministic compact source without a general-purpose code generator.
 
+For leandir creation, update/sync workflows, configuration discovery, and the CLI, see [`@leanprint/work`](https://www.npmjs.com/package/@leanprint/work).
+
 ```ts
 import { ecmascript, format } from 'leanprint'
 

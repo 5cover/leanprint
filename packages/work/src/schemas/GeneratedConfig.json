@@ -2,12 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/GeneratedConfig.json",
   "title": "GeneratedConfig",
+  "description": "Resolved session settings and integrity-protected baseline metadata generated inside a leandir. Do not edit manually.",
   "allOf": [
     {
       "$ref": "./SourceConfig.json#/$defs/config"
     },
     {
       "type": "object",
+      "not": { "required": ["ignoreFile"] },
       "properties": {
         "workspace": {
           "type": "object",
@@ -20,32 +22,31 @@
             "leandir",
             "configFilename",
             "createdAt",
-            "configHash",
             "resolvedConfigHash",
             "files",
             "integrity"
           ],
           "properties": {
-            "schemaVersion": { "const": 1 },
-            "state": { "type": "string", "enum": ["active", "applying", "synchronized"] },
-            "toolVersion": { "type": "string" },
-            "sourceRoot": { "type": "string" },
-            "leandir": { "type": "string" },
-            "configFilename": { "type": "string" },
-            "createdAt": { "type": "string" },
-            "configHash": { "type": "string" },
-            "resolvedConfigHash": { "type": "string" },
-            "integrity": { "type": "string" },
+            "schemaVersion": { "const": 2, "description": "Workspace metadata schema version." },
+            "state": { "type": "string", "enum": ["active", "updating", "applying", "synchronized"], "description": "Active workspaces may be updated or synchronized. Interrupted applying/updating states refuse unsafe retries." },
+            "toolVersion": { "type": "string", "description": "Version that created the workspace.", "examples": ["1.0.0"] },
+            "sourceRoot": { "type": "string", "description": "Absolute source-project root captured for this session.", "examples": ["/home/user/project"] },
+            "leandir": { "type": "string", "description": "Absolute materialized leandir root.", "examples": ["/tmp/project.lean"] },
+            "configFilename": { "type": "string", "description": "Repository-relative config filename used for discovery.", "examples": ["leanprint.json"] },
+            "createdAt": { "type": "string", "description": "ISO 8601 workspace creation time.", "examples": ["2026-07-26T12:00:00.000Z"] },
+            "resolvedConfigHash": { "type": "string", "description": "SHA-256 of canonical fully resolved session settings, excluding workspace metadata." },
+            "integrity": { "type": "string", "description": "SHA-256 signature of all other workspace metadata, including file baselines." },
             "files": {
+              "description": "Source and lean snapshots recorded as the shared comparison baseline.",
               "type": "object",
               "additionalProperties": {
                 "type": "object",
                 "additionalProperties": false,
                 "required": ["source", "lean", "transformed"],
                 "properties": {
-                  "source": { "$ref": "#/$defs/entry" },
-                  "lean": { "$ref": "#/$defs/entry" },
-                  "transformed": { "type": "boolean" }
+                  "source": { "$ref": "#/$defs/entry", "description": "Source-project snapshot at the baseline." },
+                  "lean": { "$ref": "#/$defs/entry", "description": "Leandir snapshot at the baseline." },
+                  "transformed": { "type": "boolean", "description": "Whether language leanification produced this leandir file." }
                 }
               }
             }

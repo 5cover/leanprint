@@ -42,10 +42,13 @@ leanprint prompt
 # Start the AI agent in this directory.
 
 leanprint status
+leanprint update # Push human/source-project changes into the leandir.
 leanprint sync
 ```
 
-A leandir is a materialized AI-oriented working copy, not a mount, cache, Git worktree, or live mirror. `create` leanifies supported files and copies other files. The generated config file records SHA-256 file state and integrity-protected workspace metadata. `sync` plans all changes first; any concurrent source-project conflict prevents every write. Supported AI source is parsed, passed to the configured human formatter through stdin/stdout, parsed again, and atomically written to the source project. A successful sync seals that workspace session; create a new leandir for further AI work.
+A leandir is a materialized AI-oriented working copy, not a mount, cache, Git worktree, or live mirror. `create` leanifies supported files and copies unsupported files byte-for-byte. During an active session, `update` pushes source additions, edits, deletions, modes, symlinks, ignore changes, and language-setting changes into the leandir while preserving unrelated AI edits. `sync` pulls AI changes back. A path changed on both sides is a conflict; both operations discover all conflicts before writing. A successful sync seals the workspace session.
+
+The generated config records a canonical SHA-256 hash of the fully resolved session configuration, including defaults, the absolute leandir, loaded ignore-file rules, language settings, formatter settings, and extension properties. JSON formatting is irrelevant. If source configuration changes, `sync` asks you to run `update`; generated settings and workspace metadata remain integrity-protected against edits.
 
 Each destination entry is replaced atomically, but the MVP does not claim project-wide rollback after an operating-system I/O failure partway through application. The workspace is first marked `applying`; if application fails, it remains in that state and refuses another sync so partial application cannot be mistaken for a clean session.
 
@@ -54,6 +57,7 @@ Each destination entry is replaced atomically, but the MVP does not claim projec
 ```txt
 leanprint [-c filename] format <file> [--write] [--language ecmascript]
 leanprint [-c filename] create [root] [--force]
+leanprint [-c filename] update [path]
 leanprint [-c filename] prompt [path]
 leanprint [-c filename] status [path]
 leanprint [-c filename] sync [path]
@@ -61,13 +65,14 @@ leanprint [-c filename] clean [path] [--force]
 leanprint [-c filename] stats tiktoken [model-or-encoding] [--json]
 ```
 
-The default config filename is `leanprint.json`. `-c` accepts a repository-relative filename and discovery tests that full filename while walking upward. Ignore globs are source-root-relative and do not read `.gitignore`.
+The default config filename is `leanprint.json`. `-c` accepts a repository-relative filename and discovery tests that full filename while walking upward. `ignoreFile` accepts one filename or an ordered array, resolved relative to the config file; patterns use gitignore semantics against source-root-relative forward-slash paths. Inline `ignore` rules apply last. Built-in defaults apply only when neither setting is supplied.
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json",
   "leandir": "/tmp/example-project.lean",
-  "ignore": [".git/**", "node_modules/**", "dist/**", "coverage/**"],
+  "ignoreFile": [".gitignore", ".leanprintignore"],
+  "ignore": ["!vendor/kept.js"],
   "languages": {
     "ecmascript": {
       "parser": {},
@@ -82,6 +87,10 @@ The default config filename is `leanprint.json`. `-c` accepts a repository-relat
   "humanFormatter": { "command": "pnpm", "args": ["exec", "prettier", "--stdin-filepath", "{file}"] }
 }
 ```
+
+The human formatter is started directly with `shell:false` in the source root. Lean source is written to stdin and formatted human source is read from stdout; `{file}` in an argument is replaced with the absolute destination path. Spawn failures, nonzero exits, and invalid output abort sync before ordinary source writes. This also supports formatter recovery: add the formatter to source configuration, run `leanprint update`, then `leanprint sync` without losing existing AI edits.
+
+Workspace states are `active`, `updating`, `applying`, and `synchronized`. Only `active` workspaces accept update or sync. An interrupted write remains in its transitional state and refuses unsafe retries. Unsupported files participate in the same baselines and conflicts as supported source, but are copied unchanged in both directions.
 
 `languages` is required; its keys are the language domains enabled for the project. An empty object enables none. Parser, token, source, and ignore defaults are declared in the schemas and applied during AJV validation. Additional properties are retained for forward compatibility. The canonical [source-project configuration schema](https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json) can be assigned to `$schema` for editor validation.
 

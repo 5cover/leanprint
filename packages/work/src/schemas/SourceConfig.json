@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json",
   "title": "SourceConfig",
+  "description": "Configures a materialized leandir and the language transformations used to create and update it.",
   "allOf": [{ "$ref": "#/$defs/config" }, { "not": { "type": "object", "required": ["workspace"] } }],
   "$defs": {
     "config": {
@@ -9,9 +10,10 @@
       "additionalProperties": true,
       "required": ["leandir", "languages"],
       "properties": {
-        "$schema": { "type": "string" },
-        "leandir": { "type": "string", "minLength": 1 },
+        "$schema": { "type": "string", "description": "JSON Schema URL used by editors." },
+        "leandir": { "type": "string", "minLength": 1, "description": "Leandir path, resolved relative to this config file's directory.", "examples": ["../project.lean", "/tmp/project.lean"] },
         "languages": {
+          "description": "Enabled language domains and their settings. An empty object copies every file unchanged.",
           "type": "object",
           "additionalProperties": { "type": "object" },
           "properties": {
@@ -19,17 +21,27 @@
           }
         },
         "ignore": {
+          "description": "Gitignore-compatible rules applied after ignoreFile rules. Paths are source-root-relative and use forward slashes.",
           "type": "array",
           "items": { "type": "string" },
-          "default": [".git/**", "node_modules/**", "dist/**", "coverage/**"]
+          "examples": [[".git/", "node_modules/", "!vendor/kept.js"]]
+        },
+        "ignoreFile": {
+          "description": "One or more gitignore-compatible files. Relative paths are resolved from this config file; files are loaded in array order.",
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+          ],
+          "examples": [".gitignore", [".gitignore", ".leanprintignore"]]
         },
         "humanFormatter": {
+          "description": "Formatter used only when pulling supported AI-edited source with sync. Lean source is sent on stdin and human source must be returned on stdout. The process runs in the source root with shell:false; every {file} argument placeholder is replaced by the absolute destination filename. Spawn errors, nonzero exits, invalid output, and stderr on failure abort sync before ordinary source writes.",
           "type": "object",
           "additionalProperties": true,
           "required": ["command"],
           "properties": {
-            "command": { "type": "string", "minLength": 1 },
-            "args": { "type": "array", "items": { "type": "string" }, "default": [] }
+            "command": { "type": "string", "minLength": 1, "description": "Executable name or path; it is invoked directly with shell:false.", "examples": ["pnpm"] },
+            "args": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Arguments passed directly to the formatter. Use {file} where the formatter needs the destination path.", "examples": [["exec", "prettier", "--stdin-filepath", "{file}"]] }
           }
         }
       }

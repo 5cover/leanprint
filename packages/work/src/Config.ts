@@ -1,4 +1,4 @@
-import { readFile, realpath } from 'node:fs/promises'
+import { readFile, realpath, stat } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { Ajv2020, type ErrorObject, type ValidateFunction } from 'ajv/dist/2020.js'
 import { ecmascriptConfigSchema, getLanguage } from 'leanprint'
@@ -19,17 +19,19 @@ function describe(errors: ErrorObject[] | null | undefined): string {
     return (errors ?? []).map(error => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`).join('; ')
 }
 
-function resolveLanguages(config: SourceConfig): ResolvedSourceConfig {
+const DEFAULT_IGNORE = ['.git/**', 'node_modules/**', 'dist/**', 'coverage/**']
+
+function resolveLanguages(config: SourceConfig, rules: string[]): ResolvedSourceConfig {
     const languages: ResolvedSourceConfig['languages'] = {}
     for (const [id, value] of Object.entries(config.languages)) {
         const language = getLanguage(id)
         if (!language) throw new InvalidConfigError(`Language "${id}" is configured but not registered.`)
         languages[id] = language.resolveConfig(value)
     }
-    const { humanFormatter, ...source } = config
+    const { humanFormatter, ignoreFile: _ignoreFile, ...source } = config
     const resolved: ResolvedSourceConfig = {
         ...source,
-        ignore: config.ignore!,
+        ignore: rules,
         languages,
     }
     if (humanFormatter) resolved.humanFormatter = { command: humanFormatter.command, args: humanFormatter.args! }
@@ -37,6 +39,29 @@ function resolveLanguages(config: SourceConfig): ResolvedSourceConfig {
 }
 
 export default class Config {
+    private static async resolveSource(config: SourceConfig, path: string): Promise<ResolvedSourceConfig> {
+        const filenames = config.ignoreFile
+            ? Array.isArray(config.ignoreFile)
+                ? config.ignoreFile
+                : [config.ignoreFile]
+            : []
+        const rules: string[] = []
+        for (const filename of filenames) {
+            const ignorePath = isAbsolute(filename) ? filename : resolve(dirname(path), filename)
+            try {
+                if (!(await stat(ignorePath)).isFile())
+                    throw new InvalidConfigError(`Ignore file is not a regular file: ${ignorePath}`)
+                rules.push(await readFile(ignorePath, 'utf8'))
+            } catch (error) {
+                if (error instanceof InvalidConfigError) throw error
+                throw new InvalidConfigError(`Could not read ignore file ${ignorePath}: ${(error as Error).message}`)
+            }
+        }
+        if (config.ignore) rules.push(...config.ignore)
+        if (!config.ignoreFile && !config.ignore) rules.push(...DEFAULT_IGNORE)
+        return resolveLanguages(config, rules)
+    }
+
     static async discover(
         start = process.cwd(),
         configFilename = 'leanprint.json'
@@ -76,12 +101,12 @@ export default class Config {
         if (generated) {
             if (!validateGenerated(parsed))
                 throw new InvalidConfigError(`Invalid config file ${path}: ${describe(validateGenerated.errors)}.`)
-            const resolved = resolveLanguages(parsed)
+            const resolved = resolveLanguages(parsed, parsed.ignore ?? [])
             return { kind: 'leandir', config: { ...resolved, workspace: parsed.workspace } }
         }
         if (!validateSource(parsed))
             throw new InvalidConfigError(`Invalid config file ${path}: ${describe(validateSource.errors)}.`)
-        const resolved = resolveLanguages(parsed)
+        const resolved = await this.resolveSource(parsed, path)
         return { kind: 'source', config: resolved }
     }
 
@@ -97,9 +122,17 @@ export default class Config {
             const source = await this.load(sourceFound.configPath)
             if (source.kind === 'leandir')
                 throw new InvalidConfigError(`Expected a source config file at ${sourceFound.configPath}.`)
-            return { config: source.config, configPath: sourceFound.configPath, sourceRoot: sourceFound.root }
+            return {
+                config: { ...source.config, leandir: resolve(dirname(sourceFound.configPath), source.config.leandir) },
+                configPath: sourceFound.configPath,
+                sourceRoot: sourceFound.root,
+            }
         }
-        return { config: loaded.config, configPath: found.configPath, sourceRoot: found.root }
+        return {
+            config: { ...loaded.config, leandir: resolve(dirname(found.configPath), loaded.config.leandir) },
+            configPath: found.configPath,
+            sourceRoot: found.root,
+        }
     }
 
     static integrity(metadata: Omit<WorkspaceMetadata, 'integrity'>): string {

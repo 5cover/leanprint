@@ -69,6 +69,9 @@ importers:
       glob:
         specifier: ^11.0.3
         version: 11.1.0
+      ignore:
+        specifier: ^7.0.6
+        version: 7.0.6
       leanprint:
         specifier: workspace:*
         version: link:../leanprint
