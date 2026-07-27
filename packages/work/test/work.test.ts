@@ -10,7 +10,7 @@ import { compareStrings, stableJson } from '../src/hash.js'
 import * as leandir from '../src/leandir.js'
 import * as prompt from '../src/prompt.js'
 import * as stats from '../src/stats/stats.js'
-import type { GeneratedConfig } from '../src/types.js'
+import type { WorkspaceLock } from '../src/types.js'
 const exec = promisify(execFile)
 async function fixture() {
     const root = await mkdtemp(join(tmpdir(), 'leanprint-test-')),
@@ -129,8 +129,15 @@ test('accepts an empty source config but guards commands that require leandir', 
 })
 test('creates, reports edits, and pulls from a leandir', async () => {
     const { root, lean } = await fixture()
-    const generated = await leandir.create(root)
-    assert.equal(generated.workspace.sourceRoot, root)
+    const workspace = await leandir.create(root)
+    assert.equal(workspace.sourceRoot, root)
+    await assert.rejects(readFile(join(lean, 'leanprint.json'), 'utf8'), { code: 'ENOENT' })
+    const lockText = await readFile(join(lean, 'leandir-lock.json'), 'utf8'),
+        lock = JSON.parse(lockText) as Record<string, unknown>
+    assert.equal(lock.sourceRoot, root)
+    assert.equal('workspace' in lock, false)
+    assert.equal('languages' in lock, false)
+    assert.equal(lockText, `${JSON.stringify(lock, null, 2)}\n`)
     assert.equal(await readFile(join(lean, 'README.md'), 'utf8'), 'hello\n')
     assert.equal(await readFile(join(lean, 'src', 'index.ts'), 'utf8'), 'export const answer:number=42\n')
     let status = await leandir.status(lean)
@@ -143,7 +150,7 @@ test('creates, reports edits, and pulls from a leandir', async () => {
     )
     await leandir.pull(lean)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer:number=43\n')
-    assert.equal((await leandir.open(lean)).config.workspace.state, 'synchronized')
+    assert.equal((await leandir.open(lean)).workspace.state, 'synchronized')
     await assert.rejects(leandir.pull(lean), /state "synchronized"/)
 })
 test('pull applies leandir-only changes while leaving source-only changes untouched', async () => {
@@ -181,15 +188,14 @@ test('pulls symlink, kind, and mode changes without following links', async () =
     assert.equal(await readlink(join(root, 'README.md')), 'src/index.ts')
     assert.equal((await lstat(join(root, 'src', 'index.ts'))).mode & 0o777, 0o755)
 })
-test('rejects edits to resolved generated configuration', async () => {
+test('rejects edits to workspace lock metadata', async () => {
     const { root, lean } = await fixture()
     await leandir.create(root)
-    const path = join(lean, 'leanprint.json')
-    const generated = JSON.parse(await readFile(path, 'utf8')) as GeneratedConfig
-    assert(generated.languages.ecmascript)
-    generated.languages.ecmascript.source.indent = 8
-    await writeFile(path, JSON.stringify(generated))
-    await assert.rejects(leandir.open(lean), /configuration integrity/)
+    const path = join(lean, 'leandir-lock.json')
+    const workspace = JSON.parse(await readFile(path, 'utf8')) as WorkspaceLock
+    workspace.state = 'synchronized'
+    await writeFile(path, JSON.stringify(workspace))
+    await assert.rejects(leandir.open(lean), /metadata integrity/)
 })
 test('reports all concurrent source conflicts before writing', async () => {
     const { root, lean } = await fixture()
@@ -204,7 +210,7 @@ test('reports all concurrent source conflicts before writing', async () => {
     await assert.rejects(leandir.pull(lean), /Pull has 2 conflict/)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 44;\n')
     assert.equal(await readFile(join(root, 'README.md'), 'utf8'), 'human edit\n')
-    assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
+    assert.equal((await leandir.open(lean)).workspace.state, 'active')
 })
 test('formatter failure aborts before source-project writes', async () => {
     const { root, lean } = await fixture()
@@ -224,7 +230,7 @@ test('formatter failure aborts before source-project writes', async () => {
 
     await assert.rejects(leandir.pull(lean), /formatter failed/)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
-    assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
+    assert.equal((await leandir.open(lean)).workspace.state, 'active')
 })
 
 test('identifies invalid human formatter stdout and writes nothing', async () => {
@@ -245,7 +251,7 @@ test('identifies invalid human formatter stdout and writes nothing', async () =>
 
     await assert.rejects(leandir.pull(lean), /Human formatter produced invalid output for src\/index\.ts/)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
-    assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
+    assert.equal((await leandir.open(lean)).workspace.state, 'active')
 })
 
 test('detects source changes made during formatter preflight before ordinary writes', async () => {
@@ -271,7 +277,7 @@ test('detects source changes made during formatter preflight before ordinary wri
 
     await assert.rejects(leandir.pull(lean), /source entry changed after pull planning/)
     assert.equal(await readFile(join(root, 'README.md'), 'utf8'), 'hello\n')
-    assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
+    assert.equal((await leandir.open(lean)).workspace.state, 'active')
 })
 
 test('refreshes workspace snapshots after a successful pull', async () => {
@@ -479,7 +485,7 @@ test('push reports every same-path conflict and writes nothing', async () => {
     await writeFile(join(lean, 'src', 'index.ts'), 'export const answer=2\n')
     await assert.rejects(leandir.push(root), /Push has 2 conflict/)
     assert.equal(await readFile(join(lean, 'README.md'), 'utf8'), 'AI\n')
-    assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
+    assert.equal((await leandir.open(lean)).workspace.state, 'active')
 })
 
 test('resolved hashes ignore JSON formatting but detect semantic and ignore-file changes', async () => {

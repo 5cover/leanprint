@@ -11,7 +11,7 @@ leanprint --help
 
 `leanprint push [path]` sends source-project changes into an active leandir. `leanprint pull [path]` retrieves AI changes; both accept either project path. Both are preflighted, and any path changed on both sides prevents all ordinary writes. Source-only changes do not block a pull and remain untouched. Unsupported files are copied byte-for-byte and receive the same conflict protection as supported source.
 
-Workspace metadata is stored in the generated config and protected by an integrity hash. A separate resolved-configuration hash covers defaults, absolute paths, loaded ignore rules, language and formatter settings, and retained extension properties. Source config changes require `push` before pull. Formatter-only changes preserve AI edits when pushed before pulling.
+The leandir contains no source-config copy. Flat workspace state is stored in `leandir-lock.json`, kept 2-space formatted, and protected by an integrity hash; add this filename to the source project's `.gitignore`. Commands started in a leandir follow the lock's source root and load the current source configuration there. A resolved-configuration hash covers defaults, absolute paths, loaded ignore rules, language and formatter settings, and retained extension properties. Source config changes require `push` before pull. Formatter-only changes preserve AI edits when pushed before pulling.
 
 Entries are replaced atomically one at a time. Before writes, push records `updating` and pull records `applying`; interruption leaves that state in place and refuses unsafe retries. Successful push returns to `active`; successful pull seals the workspace as `synchronized`.
 

@@ -4,6 +4,7 @@ import { glob } from 'glob'
 import ignore from 'ignore'
 import { compareStrings, hash, stableJson } from './hash.js'
 import type { EntrySnapshot, ResolvedSourceConfig } from './types.js'
+import { WORKSPACE_LOCK_FILENAME } from './config.js'
 
 export async function snapshot(path: string): Promise<EntrySnapshot> {
     let stat
@@ -57,7 +58,7 @@ export async function collectPaths(
         })
     )
         .map(path => path.replaceAll('\\', '/'))
-        .filter(path => path !== normalizedConfig && !matcher.ignores(path))
+        .filter(path => path !== normalizedConfig && path !== WORKSPACE_LOCK_FILENAME && !matcher.ignores(path))
         .sort(compareStrings)
 }
 

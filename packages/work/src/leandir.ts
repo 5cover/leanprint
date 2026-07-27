@@ -11,9 +11,8 @@ import type {
     Change,
     EntrySnapshot,
     FileRecord,
-    GeneratedConfig,
     ResolvedSourceConfig,
-    WorkspaceMetadata,
+    WorkspaceLock,
     WorkspaceStatus,
 } from './types.js'
 import { FormatterError, InvalidLeandirError, WorkspaceConflictError } from './types.js'
@@ -45,10 +44,10 @@ function changeKind(expected: EntrySnapshot, current: EntrySnapshot): Change['ki
     return expected.kind === 'missing' ? 'added' : 'modified'
 }
 
-async function saveWorkspace(root: string, filename: string, config: GeneratedConfig): Promise<void> {
-    const { integrity: _integrity, ...unsigned } = config.workspace
-    config.workspace = { ...unsigned, integrity: cfg.checksum(unsigned) }
-    await replaceFile(join(root, filename), `${JSON.stringify(config, null, 2)}\n`)
+async function saveWorkspace(root: string, workspace: WorkspaceLock): Promise<void> {
+    const { integrity: _integrity, ...unsigned } = workspace
+    Object.assign(workspace, { ...unsigned, integrity: cfg.checksum(unsigned) })
+    await replaceFile(join(root, cfg.WORKSPACE_LOCK_FILENAME), `${JSON.stringify(workspace, null, 2)}\n`)
 }
 
 async function prepareSource(path: string, source: EntrySnapshot, config: ResolvedSourceConfig): Promise<Prepared> {
@@ -76,7 +75,7 @@ async function create(
     start = process.cwd(),
     configFilename = 'leanprint.json',
     force = false
-): Promise<GeneratedConfig> {
+): Promise<WorkspaceLock> {
     const { config, sourceRoot } = await cfg.source(start, configFilename)
     const target = cfg.requireLeandir(config, configFilename)
     await cfg.validateLeandir(sourceRoot, target)
@@ -98,7 +97,7 @@ async function create(
         }
     }
 
-    const unsigned: Omit<WorkspaceMetadata, 'integrity'> = {
+    const unsigned: Omit<WorkspaceLock, 'integrity'> = {
         schemaVersion: WORKSPACE_VERSION,
         state: 'active',
         toolVersion: packageJson.version,
@@ -109,48 +108,44 @@ async function create(
         resolvedConfigHash: cfg.resolvedHash(config),
         files,
     }
-    const workspace: WorkspaceMetadata = { ...unsigned, integrity: cfg.checksum(unsigned) }
-    const generated: GeneratedConfig = { ...config, leandir: target, workspace }
-    await saveWorkspace(target, configFilename, generated)
-    return generated
+    const workspace: WorkspaceLock = { ...unsigned, integrity: cfg.checksum(unsigned) }
+    await saveWorkspace(target, workspace)
+    return workspace
 }
 
 async function open(
     start = process.cwd(),
-    filename = 'leanprint.json'
-): Promise<{ root: string; config: GeneratedConfig }> {
-    const found = await cfg.discover(start, filename)
-    if (!found.configPath) throw new InvalidLeandirError(`No generated config file "${filename}" found from ${start}.`)
-    const loaded = await cfg.load(found.configPath)
-    if (loaded.kind !== 'leandir') throw new InvalidLeandirError(`${found.root} is a source project, not a leandir.`)
-    cfg.validateWorkspace(loaded.config, found.root)
-    return { root: found.root, config: loaded.config }
+    _filename = 'leanprint.json'
+): Promise<{ root: string; workspace: WorkspaceLock }> {
+    const found = await cfg.discoverWorkspace(start)
+    if (!found.lockPath)
+        throw new InvalidLeandirError(`No ${cfg.WORKSPACE_LOCK_FILENAME} found from ${start}.`)
+    const workspace = await cfg.loadWorkspace(found.lockPath)
+    cfg.validateWorkspace(workspace, found.root)
+    return { root: found.root, workspace }
 }
 
 async function context(
     start: string,
     filename: string
 ): Promise<{
-    opened: { root: string; config: GeneratedConfig }
+    opened: { root: string; workspace: WorkspaceLock }
     currentConfig: ResolvedSourceConfig
     context: WorkspaceStatus['context']
 }> {
-    const found = await cfg.discover(start, filename)
-    if (found.configPath) {
-        const loaded = await cfg.load(found.configPath)
-        if (loaded.kind === 'leandir') {
-            cfg.validateWorkspace(loaded.config, found.root)
-            const source = await cfg.source(found.root, filename)
-            const currentLeandir = cfg.requireLeandir(source.config, filename)
-            if (resolve(currentLeandir) !== resolve(found.root))
-                throw new InvalidLeandirError(
-                    `Source configuration now points to ${currentLeandir}, not this leandir (${found.root}).`
-                )
-            return {
-                opened: { root: found.root, config: loaded.config },
-                currentConfig: source.config,
-                context: 'leandir',
-            }
+    const found = await cfg.discoverWorkspace(start)
+    if (found.lockPath) {
+        const opened = await open(found.root, filename)
+        const source = await cfg.source(opened.workspace.sourceRoot, opened.workspace.configFilename)
+        const currentLeandir = cfg.requireLeandir(source.config, filename)
+        if (resolve(currentLeandir) !== resolve(found.root))
+            throw new InvalidLeandirError(
+                `Source configuration now points to ${currentLeandir}, not this leandir (${found.root}).`
+            )
+        return {
+            opened,
+            currentConfig: source.config,
+            context: 'leandir',
         }
     }
     const source = await cfg.source(start, filename)
@@ -163,12 +158,12 @@ async function context(
 }
 
 async function statusOpened(
-    opened: { root: string; config: GeneratedConfig },
+    opened: { root: string; workspace: WorkspaceLock },
     currentConfig: ResolvedSourceConfig,
     context: WorkspaceStatus['context'],
     filename: string
 ): Promise<WorkspaceStatus> {
-    const workspace = opened.config.workspace
+    const workspace = opened.workspace
     const sourcePaths = new Set(await collectPaths(workspace.sourceRoot, currentConfig, filename))
     const leanPaths = new Set(await collectPaths(opened.root, currentConfig, filename))
     const paths = new Set([...Object.keys(workspace.files), ...sourcePaths, ...leanPaths])
@@ -239,9 +234,9 @@ async function status(start = process.cwd(), filename = 'leanprint.json'): Promi
 
 async function push(start = process.cwd(), filename = 'leanprint.json'): Promise<WorkspaceStatus> {
     const { opened, currentConfig, context: workspaceContext } = await context(start, filename)
-    if (opened.config.workspace.state !== 'active')
+    if (opened.workspace.state !== 'active')
         throw new InvalidLeandirError(
-            `Cannot push to a workspace in state "${opened.config.workspace.state}". Create a new leandir session.`
+            `Cannot push to a workspace in state "${opened.workspace.state}". Create a new leandir session.`
         )
     const status = await statusOpened(opened, currentConfig, workspaceContext, filename)
     if (status.conflicts.length) throw new WorkspaceConflictError(status.conflicts, 'Push')
@@ -265,8 +260,8 @@ async function push(start = process.cwd(), filename = 'leanprint.json'): Promise
             throw new WorkspaceConflictError([{ ...change, conflict: 'path changed after push planning' }], 'Push')
     }
 
-    opened.config.workspace.state = 'updating'
-    await saveWorkspace(opened.root, filename, opened.config)
+    opened.workspace.state = 'updating'
+    await saveWorkspace(opened.root, opened.workspace)
     for (const change of status.sourceChanges) {
         const target = join(opened.root, change.path)
         const item = prepared.get(change.path)
@@ -274,36 +269,31 @@ async function push(start = process.cwd(), filename = 'leanprint.json'): Promise
         if (item === undefined) {
             await rm(target, { force: true })
             // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-            delete opened.config.workspace.files[change.path]
+            delete opened.workspace.files[change.path]
             continue
         }
         await mkdir(dirname(target), { recursive: true })
         if (item.kind === 'file') await replaceFile(target, item.bytes, item.mode)
         else await replaceSymlink(target, item.target)
-        opened.config.workspace.files[change.path] = {
+        opened.workspace.files[change.path] = {
             source: stored(await snapshot(join(status.sourceRoot, change.path)), change.path),
             lean: stored(await snapshot(target), target),
             transformed: item.kind === 'file' && item.transformed,
         }
     }
 
-    const workspace = opened.config.workspace
+    const workspace = opened.workspace
     workspace.state = 'active'
     workspace.resolvedConfigHash = cfg.resolvedHash(currentConfig)
-    const generated: GeneratedConfig = {
-        ...currentConfig,
-        leandir: cfg.requireLeandir(currentConfig, filename),
-        workspace,
-    }
-    await saveWorkspace(opened.root, filename, generated)
+    await saveWorkspace(opened.root, workspace)
     return status
 }
 
 async function pull(start = process.cwd(), filename = 'leanprint.json'): Promise<WorkspaceStatus> {
     const { opened, currentConfig, context: workspaceContext } = await context(start, filename)
-    if (opened.config.workspace.state !== 'active')
+    if (opened.workspace.state !== 'active')
         throw new InvalidLeandirError(
-            `Cannot pull from a workspace in state "${opened.config.workspace.state}". Create a new leandir session.`
+            `Cannot pull from a workspace in state "${opened.workspace.state}". Create a new leandir session.`
         )
     const status = await statusOpened(opened, currentConfig, workspaceContext, filename)
     if (status.configChanged)
@@ -323,15 +313,15 @@ async function pull(start = process.cwd(), filename = 'leanprint.json'): Promise
         }
         if (change.leanCurrent.kind !== 'file') throw new InvalidLeandirError(`Unsupported entry: ${leanPath}`)
         const leanBytes = await readFile(leanPath)
-        const record = opened.config.workspace.files[change.path]
-        const language = configuredLanguage(change.path, opened.config)
+        const record = opened.workspace.files[change.path]
+        const language = configuredLanguage(change.path, currentConfig)
         if (record?.transformed ?? Boolean(language)) {
             if (!language) throw new InvalidLeandirError(`No configured language for ${change.path}.`)
             const leanSource = leanBytes.toString('utf8')
             language.leanify(leanSource, change.path)
-            if (!opened.config.humanFormatter)
+            if (!currentConfig.humanFormatter)
                 throw new InvalidLeandirError(`No human formatter configured for ${change.path}.`)
-            if (opened.config.humanFormatter.type === 'all') {
+            if (currentConfig.humanFormatter.type === 'all') {
                 batch.push({
                     relativePath: change.path,
                     path: leanPath,
@@ -345,7 +335,7 @@ async function pull(start = process.cwd(), filename = 'leanprint.json'): Promise
                 leanSource,
                 join(status.sourceRoot, change.path),
                 status.sourceRoot,
-                opened.config.humanFormatter
+                currentConfig.humanFormatter
             )
             try {
                 language.leanify(humanSource, change.path)
@@ -370,7 +360,7 @@ async function pull(start = process.cwd(), filename = 'leanprint.json'): Promise
         })
     }
     if (batch.length) {
-        const humanFormatter = opened.config.humanFormatter
+        const humanFormatter = currentConfig.humanFormatter
         assert(humanFormatter?.type === 'all')
         try {
             await formatter.formatAll(
@@ -413,8 +403,8 @@ async function pull(start = process.cwd(), filename = 'leanprint.json'): Promise
             ])
     }
 
-    opened.config.workspace.state = 'applying'
-    await saveWorkspace(opened.root, filename, opened.config)
+    opened.workspace.state = 'applying'
+    await saveWorkspace(opened.root, opened.workspace)
     for (const change of status.leandirChanges) {
         const target = join(status.sourceRoot, change.path)
         const item = prepared.get(change.path)
@@ -422,19 +412,19 @@ async function pull(start = process.cwd(), filename = 'leanprint.json'): Promise
         if (item === undefined) {
             await rm(target, { force: true })
             // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-            delete opened.config.workspace.files[change.path]
+            delete opened.workspace.files[change.path]
             continue
         }
         await mkdir(dirname(target), { recursive: true })
         if (item.kind === 'file') await replaceFile(target, item.bytes, item.mode)
         else await replaceSymlink(target, item.target)
-        opened.config.workspace.files[change.path] = {
+        opened.workspace.files[change.path] = {
             source: stored(await snapshot(target), target),
             lean: stored(await snapshot(join(opened.root, change.path)), change.path),
             transformed: item.kind === 'file' && item.transformed,
         }
     }
-    opened.config.workspace.state = 'synchronized'
-    await saveWorkspace(opened.root, filename, opened.config)
+    opened.workspace.state = 'synchronized'
+    await saveWorkspace(opened.root, opened.workspace)
     return status
 }

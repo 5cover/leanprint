@@ -10,3 +10,5 @@ Harden synchronization by identifying invalid human-formatter output, checking t
 Add batch human formatters with safe standalone argument expansion, one-process in-place formatting, and in-process restoration of lean files before synchronized source writes.
 
 Rename the directional workflow commands to `push` and `pull`, and allow pulls to proceed when unrelated source-only changes are pending.
+
+Replace the duplicated generated leandir configuration with a flat, integrity-protected `leandir-lock.json`; leandir commands now always load current settings from the source root.

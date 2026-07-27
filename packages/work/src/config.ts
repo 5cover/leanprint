@@ -3,10 +3,9 @@ import { dirname, isAbsolute, resolve } from 'node:path'
 import { Ajv2020, type ErrorObject, type ValidateFunction } from 'ajv/dist/2020.js'
 import { ecmascriptConfigSchema, getLanguage, getLanguages, jsonConfigSchema } from 'leanprint'
 import { hash, stableJson } from './hash.js'
-import generatedSchema from './schemas/GeneratedConfig.json' with { type: 'json' }
 import sourceSchema from './schemas/SourceConfig.json' with { type: 'json' }
-import type { GeneratedConfig as AuthoredGeneratedConfig } from './schemas/GeneratedConfig.generated.js'
-import type { GeneratedConfig, LoadedConfig, ResolvedSourceConfig, SourceConfig, WorkspaceMetadata } from './types.js'
+import workspaceSchema from './schemas/WorkspaceLock.json' with { type: 'json' }
+import type { ResolvedSourceConfig, SourceConfig, WorkspaceLock } from './types.js'
 import { InvalidConfigError, InvalidLeandirError } from './types.js'
 
 const ajv = new Ajv2020({ allErrors: true, useDefaults: true, coerceTypes: false, removeAdditional: false })
@@ -14,7 +13,8 @@ ajv.addSchema(ecmascriptConfigSchema)
 ajv.addSchema(jsonConfigSchema)
 ajv.addSchema(sourceSchema)
 const validateSource: ValidateFunction<SourceConfig> = ajv.compile(sourceSchema)
-const validateGenerated: ValidateFunction<AuthoredGeneratedConfig> = ajv.compile(generatedSchema)
+const validateWorkspaceLock: ValidateFunction<WorkspaceLock> = ajv.compile(workspaceSchema)
+export const WORKSPACE_LOCK_FILENAME = 'leandir-lock.json'
 
 export async function discover(
     start = process.cwd(),
@@ -44,24 +44,12 @@ export async function discover(
     }
 }
 
-export async function load(path: string): Promise<LoadedConfig> {
+export async function load(path: string): Promise<{ kind: 'source'; config: ResolvedSourceConfig }> {
     let parsed: unknown
     try {
         parsed = JSON.parse(await readFile(path, 'utf8'))
     } catch (error) {
         throw new InvalidConfigError(`Could not read config file ${path}: ${(error as Error).message}`)
-    }
-    const generated = Boolean(parsed && typeof parsed === 'object' && 'workspace' in parsed)
-    if (generated) {
-        if (!validateGenerated(parsed))
-            throw new InvalidConfigError(`Invalid config file ${path}: ${describe(validateGenerated.errors)}.`)
-        const leandir = parsed.leandir
-        if (!leandir) throw new InvalidConfigError(`Invalid generated config file ${path}: missing leandir.`)
-        const resolved = resolveLanguages(parsed, parsed.ignore ?? [])
-        return {
-            kind: 'leandir',
-            config: { ...resolved, leandir, workspace: parsed.workspace },
-        }
     }
     if (!validateSource(parsed))
         throw new InvalidConfigError(`Invalid config file ${path}: ${describe(validateSource.errors)}.`)
@@ -69,10 +57,33 @@ export async function load(path: string): Promise<LoadedConfig> {
     return { kind: 'source', config: resolved }
 }
 
+export async function loadWorkspace(path: string): Promise<WorkspaceLock> {
+    let parsed: unknown
+    try {
+        parsed = JSON.parse(await readFile(path, 'utf8'))
+    } catch (error) {
+        throw new InvalidLeandirError(`Could not read workspace lock ${path}: ${(error as Error).message}`)
+    }
+    if (!validateWorkspaceLock(parsed))
+        throw new InvalidLeandirError(`Invalid workspace lock ${path}: ${describe(validateWorkspaceLock.errors)}.`)
+    return parsed
+}
+
+export async function discoverWorkspace(start = process.cwd()): Promise<{ lockPath?: string; root: string }> {
+    const found = await discover(start, WORKSPACE_LOCK_FILENAME)
+    return { root: found.root, ...(found.configPath ? { lockPath: found.configPath } : {}) }
+}
+
 export async function source(
     start: string,
     filename: string
 ): Promise<{ config: ResolvedSourceConfig; configPath?: string; sourceRoot: string }> {
+    const workspaceFound = await discoverWorkspace(start)
+    if (workspaceFound.lockPath) {
+        const workspace = await loadWorkspace(workspaceFound.lockPath)
+        validateWorkspace(workspace, workspaceFound.root)
+        return await source(workspace.sourceRoot, workspace.configFilename)
+    }
     const found = await discover(start, filename)
     if (!found.configPath) {
         const empty: unknown = {}
@@ -84,27 +95,6 @@ export async function source(
         }
     }
     const loaded = await load(found.configPath)
-    if (loaded.kind === 'leandir') {
-        validateWorkspace(loaded.config, found.root)
-        const sourceFound = await discover(loaded.config.workspace.sourceRoot, filename)
-        if (!sourceFound.configPath) {
-            const empty: unknown = {}
-            if (!validateSource(empty))
-                throw new InvalidConfigError(`Invalid default configuration: ${describe(validateSource.errors)}.`)
-            return {
-                config: await resolveSource(empty, resolve(sourceFound.root, filename)),
-                sourceRoot: sourceFound.root,
-            }
-        }
-        const source = await load(sourceFound.configPath)
-        if (source.kind === 'leandir')
-            throw new InvalidConfigError(`Expected a source config file at ${sourceFound.configPath}.`)
-        return {
-            config: resolveLeandir(source.config, dirname(sourceFound.configPath)),
-            configPath: sourceFound.configPath,
-            sourceRoot: sourceFound.root,
-        }
-    }
     return {
         config: resolveLeandir(loaded.config, dirname(found.configPath)),
         configPath: found.configPath,
@@ -118,7 +108,7 @@ export function requireLeandir(config: ResolvedSourceConfig, filename = 'leanpri
     return config.leandir
 }
 
-export function checksum(metadata: Omit<WorkspaceMetadata, 'integrity'>): string {
+export function checksum(metadata: Omit<WorkspaceLock, 'integrity'>): string {
     return hash(stableJson(metadata))
 }
 
@@ -127,12 +117,9 @@ export function resolvedHash(config: ResolvedSourceConfig): string {
     return hash(stableJson(resolved))
 }
 
-export function validateWorkspace(config: GeneratedConfig, root: string): void {
-    const workspace = config.workspace
+export function validateWorkspace(workspace: WorkspaceLock, root: string): void {
     if (resolve(workspace.leandir) !== resolve(root))
         throw new InvalidLeandirError(`Invalid workspace metadata in ${root}.`)
-    if (workspace.resolvedConfigHash !== resolvedHash(config))
-        throw new InvalidLeandirError(`Resolved configuration integrity check failed in ${root}.`)
     const { integrity, ...unsigned } = workspace
     if (integrity !== checksum(unsigned))
         throw new InvalidLeandirError(`Workspace metadata integrity check failed in ${root}.`)

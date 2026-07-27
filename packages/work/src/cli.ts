@@ -44,8 +44,8 @@ program
         '\nExample:\n  leanprint create ~/project\n\nSafety: the leandir must be outside the source project.\n'
     )
     .action(async (root, options) => {
-        const generated = await leandir.create(root, program.opts().config, options.force)
-        process.stdout.write(`Created leandir: ${generated.workspace.leandir}\n`)
+        const workspace = await leandir.create(root, program.opts().config, options.force)
+        process.stdout.write(`Created leandir: ${workspace.leandir}\n`)
     })
 program
     .command('pull')
@@ -77,15 +77,9 @@ program
     .argument('[path]', 'project or leandir path', process.cwd())
     .addHelpText('after', '\nExample:\n  leanprint prompt /tmp/project.lean\n')
     .action(async path => {
-        const found = await cfg.discover(path, program.opts().config)
-        if (!found.configPath) {
-            const { config } = await cfg.source(path, program.opts().config)
-            process.stdout.write(prompt.generate(config, false))
-            return
-        }
-        const loaded = await cfg.load(found.configPath)
-        if (loaded.kind === 'leandir') cfg.validateWorkspace(loaded.config, found.root)
-        process.stdout.write(prompt.generate(loaded.config, loaded.kind === 'leandir'))
+        const workspace = await cfg.discoverWorkspace(path)
+        const { config } = await cfg.source(path, program.opts().config)
+        process.stdout.write(prompt.generate(config, Boolean(workspace.lockPath)))
     })
 program
     .command('status')
@@ -109,16 +103,10 @@ program
         '\nExample:\n  leanprint clean /tmp/project.lean\n\nSafety: only a verified generated leandir is removed.\n'
     )
     .action(async (path, options) => {
-        const found = await cfg.discover(path, program.opts().config)
+        const workspace = await cfg.discoverWorkspace(path)
         let opened
-        if (found.configPath) {
-            const loaded = await cfg.load(found.configPath)
-            if (loaded.kind === 'leandir') opened = await leandir.open(found.root, program.opts().config)
-            else {
-                const { config } = await cfg.source(found.root, program.opts().config)
-                opened = await leandir.open(cfg.requireLeandir(config, program.opts().config), program.opts().config)
-            }
-        } else {
+        if (workspace.lockPath) opened = await leandir.open(workspace.root, program.opts().config)
+        else {
             const { config } = await cfg.source(path, program.opts().config)
             opened = await leandir.open(cfg.requireLeandir(config, program.opts().config), program.opts().config)
         }

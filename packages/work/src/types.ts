@@ -1,5 +1,5 @@
 import type { ResolvedEcmascriptConfig, ResolvedJsonConfig, ResolvedLanguageConfig } from 'leanprint'
-import type { GeneratedConfig as AuthoredGeneratedConfig } from './schemas/GeneratedConfig.generated.js'
+import type { WorkspaceLock as AuthoredWorkspaceLock } from './schemas/WorkspaceLock.generated.js'
 export type { SourceConfig } from './schemas/SourceConfig.generated.js'
 
 export interface HumanFormatterConfig {
@@ -21,18 +21,10 @@ export interface ResolvedSourceConfig {
     [key: string]: unknown
 }
 
-export type WorkspaceMetadata = AuthoredGeneratedConfig['workspace']
-export type FileRecord = WorkspaceMetadata['files'][string]
+export type WorkspaceLock = AuthoredWorkspaceLock
+export type FileRecord = WorkspaceLock['files'][string]
 type StoredEntry = FileRecord['source']
 export type EntrySnapshot = { kind: 'missing' } | StoredEntry | { kind: 'special'; entryType: string }
-
-export interface GeneratedConfig extends ResolvedSourceConfig {
-    leandir: string
-    workspace: WorkspaceMetadata
-}
-
-export type LoadedConfig =
-    { kind: 'source'; config: ResolvedSourceConfig } | { kind: 'leandir'; config: GeneratedConfig }
 
 export interface Change {
     path: string
@@ -45,7 +37,7 @@ export interface Change {
 
 export interface WorkspaceStatus {
     context: 'source project' | 'leandir'
-    state: WorkspaceMetadata['state']
+    state: WorkspaceLock['state']
     sourceRoot: string
     leandir: string
     sourceChanges: Change[]
