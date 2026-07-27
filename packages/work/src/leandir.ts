@@ -71,7 +71,7 @@ async function create(
     force = false
 ): Promise<GeneratedConfig> {
     const { config, sourceRoot } = await cfg.source(start, configFilename)
-    const target = config.leandir
+    const target = cfg.requireLeandir(config, configFilename)
     await cfg.validateLeandir(sourceRoot, target)
     await ensureEmpty(target, force)
 
@@ -103,7 +103,7 @@ async function create(
         files,
     }
     const workspace: WorkspaceMetadata = { ...unsigned, integrity: cfg.checksum(unsigned) }
-    const generated: GeneratedConfig = { ...config, workspace }
+    const generated: GeneratedConfig = { ...config, leandir: target, workspace }
     await saveWorkspace(target, configFilename, generated)
     return generated
 }
@@ -113,6 +113,7 @@ async function open(
     filename = 'leanprint.json'
 ): Promise<{ root: string; config: GeneratedConfig }> {
     const found = await cfg.discover(start, filename)
+    if (!found.configPath) throw new InvalidLeandirError(`No generated config file "${filename}" found from ${start}.`)
     const loaded = await cfg.load(found.configPath)
     if (loaded.kind !== 'leandir') throw new InvalidLeandirError(`${found.root} is a source project, not a leandir.`)
     cfg.validateWorkspace(loaded.config, found.root)
@@ -128,23 +129,27 @@ async function context(
     context: WorkspaceStatus['context']
 }> {
     const found = await cfg.discover(start, filename)
-    const loaded = await cfg.load(found.configPath)
-    if (loaded.kind === 'leandir') {
-        cfg.validateWorkspace(loaded.config, found.root)
-        const source = await cfg.source(found.root, filename)
-        if (resolve(source.config.leandir) !== resolve(found.root))
-            throw new InvalidLeandirError(
-                `Source configuration now points to ${source.config.leandir}, not this leandir (${found.root}).`
-            )
-        return {
-            opened: { root: found.root, config: loaded.config },
-            currentConfig: source.config,
-            context: 'leandir',
+    if (found.configPath) {
+        const loaded = await cfg.load(found.configPath)
+        if (loaded.kind === 'leandir') {
+            cfg.validateWorkspace(loaded.config, found.root)
+            const source = await cfg.source(found.root, filename)
+            const currentLeandir = cfg.requireLeandir(source.config, filename)
+            if (resolve(currentLeandir) !== resolve(found.root))
+                throw new InvalidLeandirError(
+                    `Source configuration now points to ${currentLeandir}, not this leandir (${found.root}).`
+                )
+            return {
+                opened: { root: found.root, config: loaded.config },
+                currentConfig: source.config,
+                context: 'leandir',
+            }
         }
     }
-    const source = await cfg.source(found.root, filename)
+    const source = await cfg.source(start, filename)
+    const configuredLeandir = cfg.requireLeandir(source.config, filename)
     return {
-        opened: await open(source.config.leandir, filename),
+        opened: await open(configuredLeandir, filename),
         currentConfig: source.config,
         context: 'source project',
     }
@@ -278,7 +283,11 @@ async function update(start = process.cwd(), filename = 'leanprint.json'): Promi
     const workspace = opened.config.workspace
     workspace.state = 'active'
     workspace.resolvedConfigHash = cfg.resolvedHash(currentConfig)
-    const generated: GeneratedConfig = { ...currentConfig, workspace }
+    const generated: GeneratedConfig = {
+        ...currentConfig,
+        leandir: cfg.requireLeandir(currentConfig, filename),
+        workspace,
+    }
     await saveWorkspace(opened.root, filename, generated)
     return status
 }

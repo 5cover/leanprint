@@ -10,6 +10,7 @@
     {
       "type": "object",
       "not": { "required": ["ignoreFile"] },
+      "required": ["leandir", "languages", "ignore", "workspace"],
       "properties": {
         "workspace": {
           "type": "object",
@@ -52,8 +53,7 @@
             }
           }
         }
-      },
-      "required": ["workspace"]
+      }
     }
   ],
   "$defs": {

@@ -9,7 +9,8 @@ import * as cfg from '../src/config.js'
 import { compareStrings, stableJson } from '../src/hash.js'
 import * as leandir from '../src/leandir.js'
 import * as prompt from '../src/prompt.js'
-import { InvalidConfigError, type GeneratedConfig } from '../src/types.js'
+import * as stats from '../src/stats/stats.js'
+import type { GeneratedConfig } from '../src/types.js'
 const exec = promisify(execFile)
 async function fixture() {
     const root = await mkdtemp(join(tmpdir(), 'leanprint-test-')),
@@ -46,24 +47,63 @@ test('applies schema defaults while retaining additional properties', async () =
     await writeFile(path, JSON.stringify({ leandir: `${root}.lean`, languages: { ecmascript: {} }, extension: true }))
     const loaded = await cfg.load(path)
     assert.equal(loaded.kind, 'source')
-    assert.deepEqual(loaded.config.ignore, [])
+    assert.deepEqual(loaded.config.ignore, ['.git/', 'node_modules/', 'dist/', 'coverage/'])
     assert.equal(loaded.config.languages.ecmascript?.tokens.semicolons, false)
     assert.equal(loaded.config.languages.ecmascript.source.indent, 2)
     assert.equal(loaded.config.extension, true)
 })
-test('requires languages and rejects unregistered language domains', async () => {
+test('defaults absent languages to every registered language and rejects unregistered domains', async () => {
     const { root } = await fixture()
     const path = join(root, 'leanprint.json')
     await writeFile(path, JSON.stringify({ leandir: `${root}.lean` }))
-    await assert.rejects(cfg.load(path), InvalidConfigError)
+    const loaded = await cfg.load(path)
+    assert.equal(loaded.kind, 'source')
+    assert(loaded.config.languages.ecmascript)
+    assert(loaded.config.languages.json)
     await writeFile(path, JSON.stringify({ leandir: `${root}.lean`, languages: { imaginary: {} } }))
     await assert.rejects(cfg.load(path), /not registered/)
 })
-test('an explicitly empty languages map leaves source files unchanged', async () => {
+test('an explicitly empty languages map enables every registered language', async () => {
     const { root, lean } = await fixture()
+    await writeFile(join(root, 'data.json'), '{ "answer": 42 }\n')
     await writeFile(join(root, 'leanprint.json'), JSON.stringify({ leandir: lean, languages: {} }))
     await leandir.create(root)
-    assert.equal(await readFile(join(lean, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
+    assert.equal(await readFile(join(lean, 'src', 'index.ts'), 'utf8'), 'export const answer:number=42\n')
+    assert.equal(await readFile(join(lean, 'data.json'), 'utf8'), '{"answer":42}\n')
+})
+
+test('uses an in-memory default config at the explicit root when discovery finds no file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'leanprint-configless-'))
+    await mkdir(join(root, 'node_modules'))
+    await writeFile(join(root, 'index.ts'), 'export const answer = 42;\n')
+    await writeFile(join(root, 'data.json'), '{ "items": [1, 2, 3] }\n')
+    await writeFile(join(root, 'node_modules', 'ignored.ts'), 'export const ignored = true;\n')
+
+    const found = await cfg.discover(root)
+    assert.equal(found.root, root)
+    assert.equal(found.configPath, undefined)
+    const resolved = await cfg.source(root, 'leanprint.json')
+    assert.equal(resolved.sourceRoot, root)
+    assert.equal(resolved.config.leandir, undefined)
+    assert(resolved.config.languages.ecmascript)
+    assert(resolved.config.languages.json)
+    assert.deepEqual(resolved.config.ignore, ['.git/', 'node_modules/', 'dist/', 'coverage/'])
+    assert.match(prompt.generate(resolved.config, false), /For JSON files/)
+
+    const result = await stats.tiktoken({ root, modelOrEncoding: 'o200k_base' })
+    assert.equal(result.files, 2)
+    assert(result.tokensSaved > 0)
+    await assert.rejects(leandir.create(root), /No leandir is configured/)
+})
+
+test('accepts an empty source config but guards commands that require leandir', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'leanprint-empty-config-'))
+    await writeFile(join(root, 'leanprint.json'), '{}')
+    const loaded = await cfg.load(join(root, 'leanprint.json'))
+    assert.equal(loaded.kind, 'source')
+    assert(loaded.config.languages.ecmascript)
+    assert(loaded.config.languages.json)
+    await assert.rejects(leandir.create(root), /add a non-empty "leandir" property to leanprint.json/)
 })
 test('creates, reports edits, and synchronizes a leandir', async () => {
     const { root, lean } = await fixture()

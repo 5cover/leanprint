@@ -2,22 +2,23 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json",
   "title": "SourceConfig",
-  "description": "Configures a materialized leandir and the language transformations used to create and update it.",
+  "description": "Configures optional workflow settings and the language transformations used for formatting and statistics.",
   "allOf": [{ "$ref": "#/$defs/config" }, { "not": { "type": "object", "required": ["workspace"] } }],
   "$defs": {
     "config": {
       "type": "object",
       
-      "required": ["leandir", "languages"],
       "properties": {
         "$schema": { "type": "string", "description": "JSON Schema URL used by editors." },
         "leandir": { "type": "string", "minLength": 1, "description": "Leandir path, resolved relative to this config file's directory.", "examples": ["../project.lean", "/tmp/project.lean"] },
         "languages": {
-          "description": "Enabled language domains and their settings. An empty object copies every file unchanged.",
+          "description": "Enabled language domains and their settings. When omitted or empty, every registered language is enabled with its defaults.",
           "type": "object",
+          "default": {},
           "additionalProperties": { "type": "object" },
           "properties": {
-            "ecmascript": { "$ref": "../../../leanprint/src/ecmascript/EcmascriptConfig.json" }
+            "ecmascript": { "$ref": "../../../leanprint/src/ecmascript/EcmascriptConfig.json" },
+            "json": { "$ref": "../../../leanprint/src/json/JsonConfig.json" }
           }
         },
         "ignore": {

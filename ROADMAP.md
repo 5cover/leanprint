@@ -2,6 +2,8 @@
 
 consider and research and propose solutions for these feedback items i have identified. most should be simple enough or documentation. do tell me if it changes the domain significantly.
 
+- leanprint seems to be way too strict in its "conflict" detection. why would files unchanged by the AI trigger a conflict on sync if they have been changed by the user. this makes it really rigid. we should adopt uniformly the appraoch that a conflict occurs when the same file has changed in both sources. only then. if one has changed, it updates the other.
+
 - per-source savings breakdown table in stats
 
 - consider: opt-in git integration. separate branch/worktree? probably no raw .git copying. (large item)

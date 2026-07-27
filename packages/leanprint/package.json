@@ -14,10 +14,11 @@
   "files": [
     "dist",
     "README.md",
-    "src/ecmascript/EcmascriptConfig.json"
+    "src/ecmascript/EcmascriptConfig.json",
+    "src/json/JsonConfig.json"
   ],
   "scripts": {
-    "generate": "json2ts -i src/ecmascript/EcmascriptConfig.json -o src/ecmascript/EcmascriptConfig.generated.ts --bannerComment '/* Generated from EcmascriptConfig.json. Do not edit. */'",
+    "generate": "json2ts -i src/ecmascript/EcmascriptConfig.json -o src/ecmascript/EcmascriptConfig.generated.ts --bannerComment '/* Generated from EcmascriptConfig.json. Do not edit. */' && json2ts -i src/json/JsonConfig.json -o src/json/JsonConfig.generated.ts --bannerComment '/* Generated from JsonConfig.json. Do not edit. */'",
     "prebuild": "pnpm generate",
     "build": "tsdown src/index.ts --format esm --dts --no-fixed-extension",
     "pretest": "pnpm generate",
@@ -30,6 +31,7 @@
   "dependencies": {
     "@babel/parser": "^7.28.0",
     "@babel/types": "^7.28.1",
+    "@humanwhocodes/momoa": "^3.3.10",
     "ajv": "^8.20.0"
   },
   "devDependencies": {

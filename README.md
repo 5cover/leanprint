@@ -55,7 +55,7 @@ Each destination entry is replaced atomically, but the MVP does not claim projec
 ## Commands
 
 ```txt
-leanprint [-c filename] format <file> [--write] [--language ecmascript]
+leanprint [-c filename] format <file> [--write] [--language ecmascript|json]
 leanprint [-c filename] create [root] [--force]
 leanprint [-c filename] update [path]
 leanprint [-c filename] prompt [path]
@@ -65,7 +65,7 @@ leanprint [-c filename] clean [path] [--force]
 leanprint [-c filename] stats tiktoken [model-or-encoding] [--json]
 ```
 
-The default config filename is `leanprint.json`. `-c` accepts a repository-relative filename and discovery tests that full filename while walking upward. `ignoreFile` accepts one filename or an ordered array, resolved relative to the config file; patterns use gitignore semantics against source-root-relative forward-slash paths. Inline `ignore` rules apply last. Built-in defaults apply only when neither setting is supplied.
+The default config filename is `leanprint.json`. `-c` accepts a repository-relative filename and discovery tests that full filename while walking upward. If none is found, commands use an in-memory empty configuration rooted at the requested path. `ignoreFile` accepts one filename or an ordered array, resolved relative to the config file; patterns use gitignore semantics against source-root-relative forward-slash paths. Inline `ignore` rules apply last. Built-in defaults apply only when neither setting is supplied.
 
 ```json
 {
@@ -92,11 +92,13 @@ The human formatter is started directly with `shell:false` in the source root. L
 
 Workspace states are `active`, `updating`, `applying`, and `synchronized`. Only `active` workspaces accept update or sync. An interrupted write remains in its transitional state and refuses unsafe retries. Unsupported files participate in the same baselines and conflicts as supported source, but are copied unchanged in both directions.
 
-`languages` is required; its keys are the language domains enabled for the project. An empty object enables none. Parser, token, source, and ignore defaults are declared in the schemas and applied during AJV validation. Additional properties are retained for forward compatibility. The canonical [source-project configuration schema](https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json) can be assigned to `$schema` for editor validation.
+Every top-level source configuration property is optional. An absent or empty `languages` object enables every registered domain; a non-empty object enables only its keys. `leandir` is required only by workspace commands, while formatting, prompts, and statistics work without it. Parser, token, source, and ignore defaults are applied during resolution. Additional properties are retained for forward compatibility. The canonical [source-project configuration schema](https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json) can be assigned to `$schema` for editor validation.
 
 ## Current status and syntax
 
 The ECMAScript printer has explicit dispatch for every standardized, TypeScript, and JSX node exposed by the installed Babel AST version for the parser plugins LeanPrint enables. This includes statement and control-flow forms, modules and import attributes, explicit resource management, decorators, classes and fields, JSX/TSX, and TypeScript declarations and type syntax. Representative behavioral fixtures verify reparsing and AST equivalence; the complete dispatch inventory is structural coverage rather than a claim that every combination of syntax has an independent semantic fixture.
+
+The JSON domain parses strict JSON, preserves member order, duplicate keys, and numeric spelling, and uses a recursive complexity budget rather than a column limit. Values at or below the default budget of eight remain minified on one line; larger containers expand recursively. It does not accept JSONC or JSON5 syntax.
 
 Flow syntax and experimental proposal families that are not enabled in the parser—such as pipeline, record/tuple, bind, module-expression, and do-expression proposals—are outside the current language domain. If an enabled parser or a future Babel release produces an unknown node, LeanPrint fails explicitly with `UnsupportedNodeError` rather than emitting partial source.
 

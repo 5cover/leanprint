@@ -1,7 +1,7 @@
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { Ajv2020, type ErrorObject, type ValidateFunction } from 'ajv/dist/2020.js'
-import { ecmascriptConfigSchema, getLanguage } from 'leanprint'
+import { ecmascriptConfigSchema, getLanguage, getLanguages, jsonConfigSchema } from 'leanprint'
 import { hash, stableJson } from './hash.js'
 import generatedSchema from './schemas/GeneratedConfig.json' with { type: 'json' }
 import sourceSchema from './schemas/SourceConfig.json' with { type: 'json' }
@@ -11,6 +11,7 @@ import { InvalidConfigError, InvalidLeandirError } from './types.js'
 
 const ajv = new Ajv2020({ allErrors: true, useDefaults: true, coerceTypes: false, removeAdditional: false })
 ajv.addSchema(ecmascriptConfigSchema)
+ajv.addSchema(jsonConfigSchema)
 ajv.addSchema(sourceSchema)
 const validateSource: ValidateFunction<SourceConfig> = ajv.compile(sourceSchema)
 const validateGenerated: ValidateFunction<AuthoredGeneratedConfig> = ajv.compile(generatedSchema)
@@ -18,7 +19,7 @@ const validateGenerated: ValidateFunction<AuthoredGeneratedConfig> = ajv.compile
 export async function discover(
     start = process.cwd(),
     configFilename = 'leanprint.json'
-): Promise<{ configPath: string; root: string }> {
+): Promise<{ configPath?: string; root: string }> {
     if (isAbsolute(configFilename) || configFilename.split(/[\\/]/).includes('..'))
         throw new InvalidConfigError("Config filename must be repository-relative and may not contain '..'.")
     let current = resolve(start)
@@ -28,6 +29,7 @@ export async function discover(
     } catch {
         /* A nonexistent start path is handled by upward discovery. */
     }
+    const fallbackRoot = current
     while (true) {
         const candidate = resolve(current, configFilename)
         try {
@@ -37,7 +39,7 @@ export async function discover(
             if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
         }
         const parent = dirname(current)
-        if (parent === current) throw new InvalidConfigError(`No config file "${configFilename}" found from ${start}.`)
+        if (parent === current) return { root: fallbackRoot }
         current = parent
     }
 }
@@ -53,8 +55,13 @@ export async function load(path: string): Promise<LoadedConfig> {
     if (generated) {
         if (!validateGenerated(parsed))
             throw new InvalidConfigError(`Invalid config file ${path}: ${describe(validateGenerated.errors)}.`)
+        const leandir = parsed.leandir
+        if (!leandir) throw new InvalidConfigError(`Invalid generated config file ${path}: missing leandir.`)
         const resolved = resolveLanguages(parsed, parsed.ignore ?? [])
-        return { kind: 'leandir', config: { ...resolved, workspace: parsed.workspace } }
+        return {
+            kind: 'leandir',
+            config: { ...resolved, leandir, workspace: parsed.workspace },
+        }
     }
     if (!validateSource(parsed))
         throw new InvalidConfigError(`Invalid config file ${path}: ${describe(validateSource.errors)}.`)
@@ -65,26 +72,50 @@ export async function load(path: string): Promise<LoadedConfig> {
 export async function source(
     start: string,
     filename: string
-): Promise<{ config: ResolvedSourceConfig; configPath: string; sourceRoot: string }> {
+): Promise<{ config: ResolvedSourceConfig; configPath?: string; sourceRoot: string }> {
     const found = await discover(start, filename)
+    if (!found.configPath) {
+        const empty: unknown = {}
+        if (!validateSource(empty))
+            throw new InvalidConfigError(`Invalid default configuration: ${describe(validateSource.errors)}.`)
+        return {
+            config: await resolveSource(empty, resolve(found.root, filename)),
+            sourceRoot: found.root,
+        }
+    }
     const loaded = await load(found.configPath)
     if (loaded.kind === 'leandir') {
         validateWorkspace(loaded.config, found.root)
         const sourceFound = await discover(loaded.config.workspace.sourceRoot, filename)
+        if (!sourceFound.configPath) {
+            const empty: unknown = {}
+            if (!validateSource(empty))
+                throw new InvalidConfigError(`Invalid default configuration: ${describe(validateSource.errors)}.`)
+            return {
+                config: await resolveSource(empty, resolve(sourceFound.root, filename)),
+                sourceRoot: sourceFound.root,
+            }
+        }
         const source = await load(sourceFound.configPath)
         if (source.kind === 'leandir')
             throw new InvalidConfigError(`Expected a source config file at ${sourceFound.configPath}.`)
         return {
-            config: { ...source.config, leandir: resolve(dirname(sourceFound.configPath), source.config.leandir) },
+            config: resolveLeandir(source.config, dirname(sourceFound.configPath)),
             configPath: sourceFound.configPath,
             sourceRoot: sourceFound.root,
         }
     }
     return {
-        config: { ...loaded.config, leandir: resolve(dirname(found.configPath), loaded.config.leandir) },
+        config: resolveLeandir(loaded.config, dirname(found.configPath)),
         configPath: found.configPath,
         sourceRoot: found.root,
     }
+}
+
+export function requireLeandir(config: ResolvedSourceConfig, filename = 'leanprint.json'): string {
+    if (!config.leandir)
+        throw new InvalidConfigError(`No leandir is configured; add a non-empty "leandir" property to ${filename}.`)
+    return config.leandir
 }
 
 export function checksum(metadata: Omit<WorkspaceMetadata, 'integrity'>): string {
@@ -122,7 +153,10 @@ async function resolveSource(config: SourceConfig, path: string): Promise<Resolv
             ? config.ignoreFile
             : [config.ignoreFile]
         : []
-    const rules: string[] = []
+    const rules: string[] =
+        config.ignore === undefined && config.ignoreFile === undefined
+            ? ['.git/', 'node_modules/', 'dist/', 'coverage/']
+            : []
     for (const filename of filenames) {
         const ignorePath = isAbsolute(filename) ? filename : resolve(dirname(path), filename)
         try {
@@ -140,7 +174,9 @@ async function resolveSource(config: SourceConfig, path: string): Promise<Resolv
 
 function resolveLanguages(config: SourceConfig, rules: string[]): ResolvedSourceConfig {
     const languages: ResolvedSourceConfig['languages'] = {}
-    for (const [id, value] of Object.entries(config.languages)) {
+    const configured = Object.entries(config.languages ?? {})
+    const entries = configured.length ? configured : getLanguages().map(language => [language.id, {}] as const)
+    for (const [id, value] of entries) {
         const language = getLanguage(id)
         if (!language) throw new InvalidConfigError(`Language "${id}" is configured but not registered.`)
         languages[id] = language.resolveConfig(value)
@@ -153,6 +189,10 @@ function resolveLanguages(config: SourceConfig, rules: string[]): ResolvedSource
     }
     if (humanFormatter) resolved.humanFormatter = { command: humanFormatter.command, args: humanFormatter.args ?? [] }
     return resolved
+}
+
+function resolveLeandir(config: ResolvedSourceConfig, base: string): ResolvedSourceConfig {
+    return config.leandir ? { ...config, leandir: resolve(base, config.leandir) } : config
 }
 
 function describe(errors: ErrorObject[] | null | undefined): string {

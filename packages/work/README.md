@@ -15,7 +15,9 @@ Workspace metadata is stored in the generated config and protected by an integri
 
 Entries are replaced atomically one at a time. Before writes, update records `updating` and sync records `applying`; interruption leaves that state in place and refuses unsafe retries. Successful update returns to `active`; successful sync seals the workspace as `synchronized`.
 
-Project configuration is validated against [SourceConfig.json](https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json). Add that URL as the config file's `$schema` value for editor validation. The required `languages` map enables language domains independently and scopes each domain's `parser`, `tokens`, and `source` settings.
+Project configuration is optional. When upward discovery finds no file, LeanPrint uses an in-memory empty configuration rooted at the requested project path. Configuration files are validated against [SourceConfig.json](https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json); add that URL as `$schema` for editor validation.
+
+An absent or empty `languages` map enables every registered language with defaults. A non-empty map enables only its listed domains and scopes each domain's `parser`, `tokens`, and `source` settings. ECMAScript-family and strict JSON files are built in.
 
 ```json
 {
@@ -27,6 +29,8 @@ Project configuration is validated against [SourceConfig.json](https://raw.githu
 }
 ```
 
-`ignoreFile` accepts a string or ordered array of gitignore-compatible files resolved from the config directory. Inline `ignore` rules apply afterward, so they can negate file rules. Defaults for `.git`, `node_modules`, `dist`, and `coverage` apply only when neither option is present.
+`leandir` is optional for formatting, prompts, and statistics. Workspace commands report a clear configuration error when they need a leandir and none is configured.
+
+`ignoreFile` accepts a string or ordered array of gitignore-compatible files resolved from the config directory. Inline `ignore` rules apply afterward, so they can negate file rules. Defaults for `.git`, `node_modules`, `dist`, and `coverage` apply only when neither option is present, including configless operation.
 
 The human formatter protocol is stdin to stdout. LeanPrint invokes `command` directly with `shell:false`, in the source root, and replaces `{file}` in every argument with the absolute destination path. Spawn errors, nonzero exits, or output that cannot be parsed and leanified abort the operation before ordinary source files are written.

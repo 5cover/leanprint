@@ -27,6 +27,14 @@ export function generate(config: ResolvedSourceConfig, inLeandir: boolean): stri
             parts.push('Simple single-statement control-flow bodies may remain collapsed.')
         parts.push('Keep comments and valid language syntax.')
     }
+    const json = config.languages.json
+    if (json) {
+        const { source } = json
+        parts.push(
+            `For JSON files, keep containers with recursive complexity up to ${String(source.inlineComplexity)} inline and expand more complex containers with ${source.indent === 2 ? 'two-space' : `${String(source.indent)}-space`} indentation.`,
+            'Omit optional JSON whitespace and use canonical safe string escapes while preserving strict JSON syntax.'
+        )
+    }
     if (inLeandir)
         parts.push(
             'Do not run Prettier or apply conventional human formatting inside this leandir.',

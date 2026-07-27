@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/5cover/leanprint/main/packages/leanprint/src/json/JsonConfig.json",
+  "title": "JsonConfig",
+  "description": "Parser and source-rendering settings for strict JSON files.",
+  "type": "object",
+  "properties": {
+    "parser": {
+      "title": "Parser settings",
+      "description": "Reserved strict JSON parser settings.",
+      "type": "object",
+      "default": {}
+    },
+    "tokens": {
+      "title": "Token settings",
+      "description": "Reserved JSON token settings.",
+      "type": "object",
+      "default": {}
+    },
+    "source": {
+      "title": "Source rendering settings",
+      "description": "Controls JSON layout and line endings.",
+      "type": "object",
+      "default": {},
+      "properties": {
+        "indent": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2,
+          "description": "Spaces per indentation level.",
+          "examples": [2, 4]
+        },
+        "inlineComplexity": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 8,
+          "description": "Maximum recursive value complexity kept on one line."
+        },
+        "lineEnding": {
+          "type": "string",
+          "enum": ["lf", "crlf"],
+          "default": "lf",
+          "description": "Output line-ending convention."
+        }
+      }
+    }
+  }
+}

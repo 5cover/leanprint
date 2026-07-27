@@ -1,6 +1,7 @@
 import { extname } from 'node:path'
 import { UnsupportedLanguageError } from './errors.js'
 import { ecmascript } from './ecmascript/index.js'
+import { json } from './json/index.js'
 import type { AnyLanguage, FormatOptions } from './types.js'
 
 type EcmascriptFormatOptions = {
@@ -29,6 +30,7 @@ function addLanguage(language: AnyLanguage): void {
 }
 
 addLanguage(ecmascript)
+addLanguage(json)
 
 export const defineLanguage = <L extends AnyLanguage>(language: L): L => language
 

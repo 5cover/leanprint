@@ -1,4 +1,4 @@
-import type { ResolvedEcmascriptConfig, ResolvedLanguageConfig } from 'leanprint'
+import type { ResolvedEcmascriptConfig, ResolvedJsonConfig, ResolvedLanguageConfig } from 'leanprint'
 import type { GeneratedConfig as AuthoredGeneratedConfig } from './schemas/GeneratedConfig.generated.js'
 export type { SourceConfig } from './schemas/SourceConfig.generated.js'
 
@@ -9,10 +9,11 @@ export interface HumanFormatterConfig {
 
 export interface ResolvedSourceConfig {
     $schema?: string
-    leandir: string
+    leandir?: string
     ignore: string[]
     languages: {
         ecmascript?: ResolvedEcmascriptConfig
+        json?: ResolvedJsonConfig
         [id: string]: ResolvedLanguageConfig | undefined
     }
     humanFormatter?: HumanFormatterConfig
@@ -25,6 +26,7 @@ type StoredEntry = FileRecord['source']
 export type EntrySnapshot = { kind: 'missing' } | StoredEntry | { kind: 'special'; entryType: string }
 
 export interface GeneratedConfig extends ResolvedSourceConfig {
+    leandir: string
     workspace: WorkspaceMetadata
 }
 

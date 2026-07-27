@@ -77,11 +77,15 @@ program
     .argument('[path]', 'project or leandir path', process.cwd())
     .addHelpText('after', '\nExample:\n  leanprint prompt /tmp/project.lean\n')
     .action(async path => {
-        const found = await cfg.discover(path, program.opts().config),
-            loaded = await cfg.load(found.configPath),
-            inLeandir = loaded.kind === 'leandir'
+        const found = await cfg.discover(path, program.opts().config)
+        if (!found.configPath) {
+            const { config } = await cfg.source(path, program.opts().config)
+            process.stdout.write(prompt.generate(config, false))
+            return
+        }
+        const loaded = await cfg.load(found.configPath)
         if (loaded.kind === 'leandir') cfg.validateWorkspace(loaded.config, found.root)
-        process.stdout.write(prompt.generate(loaded.config, inLeandir))
+        process.stdout.write(prompt.generate(loaded.config, loaded.kind === 'leandir'))
     })
 program
     .command('status')
@@ -105,12 +109,19 @@ program
         '\nExample:\n  leanprint clean /tmp/project.lean\n\nSafety: only a verified generated leandir is removed.\n'
     )
     .action(async (path, options) => {
-        const found = await cfg.discover(path, program.opts().config),
-            loaded = await cfg.load(found.configPath),
-            opened =
-                loaded.kind === 'leandir'
-                    ? await leandir.open(found.root, program.opts().config)
-                    : await leandir.open(resolve(found.root, loaded.config.leandir), program.opts().config)
+        const found = await cfg.discover(path, program.opts().config)
+        let opened
+        if (found.configPath) {
+            const loaded = await cfg.load(found.configPath)
+            if (loaded.kind === 'leandir') opened = await leandir.open(found.root, program.opts().config)
+            else {
+                const { config } = await cfg.source(found.root, program.opts().config)
+                opened = await leandir.open(cfg.requireLeandir(config, program.opts().config), program.opts().config)
+            }
+        } else {
+            const { config } = await cfg.source(path, program.opts().config)
+            opened = await leandir.open(cfg.requireLeandir(config, program.opts().config), program.opts().config)
+        }
         if (!options.force) {
             if (!process.stdin.isTTY)
                 throw new Error('Confirmation required; use --force in non-interactive environments.')
