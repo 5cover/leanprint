@@ -21,7 +21,7 @@ async function fixture() {
             leandir: lean,
             languages: { ecmascript: {} },
             ignore: ['ignored/**'],
-            humanFormatter: { command: process.execPath, args: ['-e', 'process.stdin.pipe(process.stdout)'] },
+            humanFormatter: { command: process.execPath, args: ['-e', 'process.stdin.pipe(process.stdout)', '{file}'] },
         })
     )
     await mkdir(join(root, 'src'))
@@ -51,6 +51,28 @@ test('applies schema defaults while retaining additional properties', async () =
     assert.equal(loaded.config.languages.ecmascript?.tokens.semicolons, false)
     assert.equal(loaded.config.languages.ecmascript.source.indent, 2)
     assert.equal(loaded.config.extension, true)
+})
+test('validates standalone formatter placeholders by formatter type', async () => {
+    const { root, lean } = await fixture()
+    const path = join(root, 'leanprint.json')
+    const formatter = (type: 'one' | 'all', args: string[]) => ({
+        leandir: lean,
+        humanFormatter: { type, command: 'formatter', args },
+    })
+    await writeFile(path, JSON.stringify(formatter('one', ['--stdin-filepath={file}'])))
+    await assert.rejects(cfg.load(path), /requires exactly one standalone \{file\}/)
+    await writeFile(path, JSON.stringify(formatter('one', ['{file}', '{files}'])))
+    await assert.rejects(cfg.load(path), /does not accept the \{files\}/)
+    await writeFile(path, JSON.stringify(formatter('all', ['{files}', '{files}'])))
+    await assert.rejects(cfg.load(path), /requires exactly one standalone \{files\}/)
+    await writeFile(path, JSON.stringify(formatter('all', ['{file}'])))
+    await assert.rejects(cfg.load(path), /requires exactly one standalone \{files\}/)
+    await writeFile(
+        path,
+        JSON.stringify({ leandir: lean, humanFormatter: { command: 'formatter', args: ['{file}'] } })
+    )
+    const loaded = await cfg.load(path)
+    assert.equal(loaded.config.humanFormatter?.type, 'one')
 })
 test('defaults absent languages to every registered language and rejects unregistered domains', async () => {
     const { root } = await fixture()
@@ -177,7 +199,7 @@ test('formatter failure aborts before source-project writes', async () => {
             languages: { ecmascript: {} },
             humanFormatter: {
                 command: process.execPath,
-                args: ['-e', "process.stderr.write('formatter failed');process.exit(2)"],
+                args: ['-e', "process.stderr.write('formatter failed');process.exit(2)", '{file}'],
             },
         })
     )
@@ -187,6 +209,180 @@ test('formatter failure aborts before source-project writes', async () => {
     await assert.rejects(leandir.sync(lean), /formatter failed/)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
     assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
+})
+
+test('identifies invalid human formatter stdout and writes nothing', async () => {
+    const { root, lean } = await fixture()
+    await writeFile(
+        join(root, 'leanprint.json'),
+        JSON.stringify({
+            leandir: lean,
+            languages: { ecmascript: {} },
+            humanFormatter: {
+                command: process.execPath,
+                args: ['-e', "process.stdout.write('Already up to date\\n');process.stdin.pipe(process.stdout)", '{file}'],
+            },
+        })
+    )
+    await leandir.create(root)
+    await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
+
+    await assert.rejects(leandir.sync(lean), /Human formatter produced invalid output for src\/index\.ts/)
+    assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
+    assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
+})
+
+test('detects source changes made during formatter preflight before ordinary writes', async () => {
+    const { root, lean } = await fixture()
+    await writeFile(
+        join(root, 'leanprint.json'),
+        JSON.stringify({
+            leandir: lean,
+            languages: { ecmascript: {} },
+            humanFormatter: {
+                command: process.execPath,
+                args: [
+                    '-e',
+                    "require('node:fs').writeFileSync(process.argv[1], 'external change\\n');process.stdin.pipe(process.stdout)",
+                    '{file}',
+                ],
+            },
+        })
+    )
+    await leandir.create(root)
+    await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
+    await writeFile(join(lean, 'README.md'), 'AI edit\n')
+
+    await assert.rejects(leandir.sync(lean), /source entry changed after synchronization planning/)
+    assert.equal(await readFile(join(root, 'README.md'), 'utf8'), 'hello\n')
+    assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
+})
+
+test('refreshes workspace snapshots after successful synchronization', async () => {
+    const { root, lean } = await fixture()
+    await leandir.create(root)
+    await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
+    await writeFile(join(lean, 'added.txt'), 'added\n')
+    await leandir.sync(lean)
+
+    const status = await leandir.status(lean)
+    assert.equal(status.state, 'synchronized')
+    assert.deepEqual(status.sourceChanges, [])
+    assert.deepEqual(status.leandirChanges, [])
+    assert.deepEqual(status.conflicts, [])
+})
+
+test('batch formatter expands files as argv entries, ignores stdout, and restores lean files', async () => {
+    const { root, lean } = await fixture()
+    await writeFile(join(root, 'src', 'with space.ts'), 'export const spaced: number = 1;\n')
+    await writeFile(
+        join(root, 'leanprint.json'),
+        JSON.stringify({
+            leandir: lean,
+            languages: { ecmascript: {} },
+            humanFormatter: {
+                type: 'all',
+                command: process.execPath,
+                args: [
+                    '-e',
+                    "const fs=require('node:fs');for(const file of process.argv.slice(1))fs.appendFileSync(file,'// formatted\\n');process.stdout.write('Already up to date\\n')",
+                    '{files}',
+                ],
+            },
+        })
+    )
+    await leandir.create(root)
+    await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
+    await writeFile(join(lean, 'src', 'with space.ts'), 'export const spaced:number=2\n')
+    await chmod(join(lean, 'src', 'index.ts'), 0o755)
+    const indexLean = await readFile(join(lean, 'src', 'index.ts')),
+        spacedLean = await readFile(join(lean, 'src', 'with space.ts'))
+
+    await leandir.sync(lean)
+
+    assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), `${indexLean.toString()}// formatted\n`)
+    assert.equal(await readFile(join(root, 'src', 'with space.ts'), 'utf8'), `${spacedLean.toString()}// formatted\n`)
+    assert.deepEqual(await readFile(join(lean, 'src', 'index.ts')), indexLean)
+    assert.deepEqual(await readFile(join(lean, 'src', 'with space.ts')), spacedLean)
+    assert.equal((await lstat(join(lean, 'src', 'index.ts'))).mode & 0o777, 0o755)
+})
+
+test('batch formatter failure restores every lean file and writes no source files', async () => {
+    const { root, lean } = await fixture()
+    await writeFile(join(root, 'src', 'second.ts'), 'export const second: number = 1;\n')
+    await writeFile(
+        join(root, 'leanprint.json'),
+        JSON.stringify({
+            leandir: lean,
+            languages: { ecmascript: {} },
+            humanFormatter: {
+                type: 'all',
+                command: process.execPath,
+                args: [
+                    '-e',
+                    "const fs=require('node:fs');for(const file of process.argv.slice(1))fs.writeFileSync(file,'damaged');process.stderr.write('failed');process.exit(2)",
+                    '{files}',
+                ],
+            },
+        })
+    )
+    await leandir.create(root)
+    await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
+    await writeFile(join(lean, 'src', 'second.ts'), 'export const second:number=2\n')
+    const indexLean = await readFile(join(lean, 'src', 'index.ts')),
+        secondLean = await readFile(join(lean, 'src', 'second.ts'))
+
+    await assert.rejects(leandir.sync(lean), /failed/)
+    assert.deepEqual(await readFile(join(lean, 'src', 'index.ts')), indexLean)
+    assert.deepEqual(await readFile(join(lean, 'src', 'second.ts')), secondLean)
+    assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
+    assert.equal(await readFile(join(root, 'src', 'second.ts'), 'utf8'), 'export const second: number = 1;\n')
+})
+
+test('invalid batch formatter output restores all lean files and writes nothing', async () => {
+    const { root, lean } = await fixture()
+    await writeFile(
+        join(root, 'leanprint.json'),
+        JSON.stringify({
+            leandir: lean,
+            languages: { ecmascript: {} },
+            humanFormatter: {
+                type: 'all',
+                command: process.execPath,
+                args: ['-e', "require('node:fs').writeFileSync(process.argv[1],'const =')", '{files}'],
+            },
+        })
+    )
+    await leandir.create(root)
+    await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
+    const leanBytes = await readFile(join(lean, 'src', 'index.ts'))
+
+    await assert.rejects(leandir.sync(lean), /Human formatter produced invalid output/)
+    assert.deepEqual(await readFile(join(lean, 'src', 'index.ts')), leanBytes)
+    assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
+})
+
+test('batch formatter restores a file deleted by the subprocess', async () => {
+    const { root, lean } = await fixture()
+    await writeFile(
+        join(root, 'leanprint.json'),
+        JSON.stringify({
+            leandir: lean,
+            languages: { ecmascript: {} },
+            humanFormatter: {
+                type: 'all',
+                command: process.execPath,
+                args: ['-e', "require('node:fs').unlinkSync(process.argv[1])", '{files}'],
+            },
+        })
+    )
+    await leandir.create(root)
+    await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
+    const leanBytes = await readFile(join(lean, 'src', 'index.ts'))
+
+    await assert.rejects(leandir.sync(lean), /did not leave a regular file/)
+    assert.deepEqual(await readFile(join(lean, 'src', 'index.ts')), leanBytes)
+    assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
 })
 
 test('loads ordered gitignore files and applies inline rules last', async () => {
@@ -300,7 +496,7 @@ test('formatter-only update enables recovery and sync accepts a source path', as
             leandir: lean,
             languages: { ecmascript: {} },
             ignore: ['ignored/**'],
-            humanFormatter: { command: process.execPath, args: ['-e', 'process.stdin.pipe(process.stdout)'] },
+            humanFormatter: { command: process.execPath, args: ['-e', 'process.stdin.pipe(process.stdout)', '{file}'] },
         })
     )
     await leandir.update(root)
@@ -320,7 +516,7 @@ test('update reconciles ignore and language projection changes', async () => {
             leandir: lean,
             languages: { ecmascript: { source: { spaceAroundOperators: true } } },
             ignore: ['hidden.txt'],
-            humanFormatter: { command: process.execPath, args: ['-e', 'process.stdin.pipe(process.stdout)'] },
+            humanFormatter: { command: process.execPath, args: ['-e', 'process.stdin.pipe(process.stdout)', '{file}'] },
         })
     )
     const pending = await leandir.status(root)

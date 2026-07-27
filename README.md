@@ -84,11 +84,15 @@ The default config filename is `leanprint.json`. `-c` accepts a repository-relat
       }
     }
   },
-  "humanFormatter": { "command": "pnpm", "args": ["exec", "prettier", "--stdin-filepath", "{file}"] }
+  "humanFormatter": {
+    "type": "all",
+    "command": "pnpm",
+    "args": ["exec", "prettier", "--write", "{files}"]
+  }
 }
 ```
 
-The human formatter is started directly with `shell:false` in the source root. Lean source is written to stdin and formatted human source is read from stdout; `{file}` in an argument is replaced with the absolute destination path. Spawn failures, nonzero exits, and invalid output abort sync before ordinary source writes. This also supports formatter recovery: add the formatter to source configuration, run `leanprint update`, then `leanprint sync` without losing existing AI edits.
+The human formatter is started directly with `shell:false` in the source root. Batch mode (`type: "all"`) expands the standalone `"{files}"` argument into absolute leandir paths and expects the formatter to edit them in place. LeanPrint invokes it once, reads and validates every result, and restores the lean files in a `finally` block before writing human source. Successful stdout such as package-manager progress is ignored. Single-file mode (`type: "one"`, the default) writes lean source to stdin, reads human source from stdout, and replaces a standalone `"{file}"` argument with the absolute human destination path. Spawn failures, nonzero exits, invalid output, and source races abort sync before ordinary source writes.
 
 Workspace states are `active`, `updating`, `applying`, and `synchronized`. Only `active` workspaces accept update or sync. An interrupted write remains in its transitional state and refuses unsafe retries. Unsupported files participate in the same baselines and conflicts as supported source, but are copied unchanged in both directions.
 

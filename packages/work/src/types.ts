@@ -3,6 +3,7 @@ import type { GeneratedConfig as AuthoredGeneratedConfig } from './schemas/Gener
 export type { SourceConfig } from './schemas/SourceConfig.generated.js'
 
 export interface HumanFormatterConfig {
+    type: 'one' | 'all'
     command: string
     args: string[]
 }

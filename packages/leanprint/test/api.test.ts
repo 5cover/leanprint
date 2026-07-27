@@ -38,6 +38,15 @@ test('validates options through the language schema without mutating callers', (
 test('rejects unknown extensions', () => {
     assert.throws(() => format('x', { filepath: 'x.py' }), UnsupportedLanguageError)
 })
+test('preserves a relative filepath in parse diagnostics', () => {
+    assert.throws(
+        () => format('const = value', { filepath: 'src/invalid.ts' }),
+        error =>
+            error instanceof Error &&
+            error.message.includes('src/invalid.ts:1:7') &&
+            !error.message.includes(process.cwd())
+    )
+})
 test('rejects duplicate language identifiers and extension ownership', () => {
     assert.throws(() => {
         registerLanguage(ecmascript)

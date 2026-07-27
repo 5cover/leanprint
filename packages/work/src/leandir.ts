@@ -16,13 +16,20 @@ import type {
     WorkspaceMetadata,
     WorkspaceStatus,
 } from './types.js'
-import { InvalidLeandirError, WorkspaceConflictError } from './types.js'
+import { FormatterError, InvalidLeandirError, WorkspaceConflictError } from './types.js'
 import assert from 'node:assert'
 
 const WORKSPACE_VERSION = 2 as const
 type StoredEntry = Exclude<EntrySnapshot, { kind: 'missing' | 'special' }>
 type Prepared =
     { kind: 'file'; bytes: Buffer; mode: number; transformed: boolean } | { kind: 'symlink'; target: string }
+type BatchCandidate = {
+    relativePath: string
+    path: string
+    leanBytes: Buffer
+    mode: number
+    language: NonNullable<ReturnType<typeof configuredLanguage>>
+}
 
 export { create, open, status, sync, update }
 
@@ -309,7 +316,8 @@ async function sync(start = process.cwd(), filename = 'leanprint.json'): Promise
             'Source project has changes pending; run `leanprint update` before `leanprint sync`.'
         )
 
-    const prepared = new Map<string, Prepared>()
+    const prepared = new Map<string, Prepared>(),
+        batch: BatchCandidate[] = []
     for (const change of status.leandirChanges) {
         if (change.kind === 'deleted') continue
         const leanPath = join(opened.root, change.path)
@@ -318,34 +326,92 @@ async function sync(start = process.cwd(), filename = 'leanprint.json'): Promise
             continue
         }
         if (change.leanCurrent.kind !== 'file') throw new InvalidLeandirError(`Unsupported entry: ${leanPath}`)
-        let bytes = await readFile(leanPath)
+        const leanBytes = await readFile(leanPath)
         const record = opened.config.workspace.files[change.path]
         const language = configuredLanguage(change.path, opened.config)
         if (record?.transformed ?? Boolean(language)) {
             if (!language) throw new InvalidLeandirError(`No configured language for ${change.path}.`)
-            language.leanify(bytes.toString('utf8'), change.path)
+            const leanSource = leanBytes.toString('utf8')
+            language.leanify(leanSource, change.path)
             if (!opened.config.humanFormatter)
                 throw new InvalidLeandirError(`No human formatter configured for ${change.path}.`)
-            bytes = Buffer.from(
-                await formatter.format(
-                    bytes.toString('utf8'),
-                    join(status.sourceRoot, change.path),
-                    status.sourceRoot,
-                    opened.config.humanFormatter
-                )
+            if (opened.config.humanFormatter.type === 'all') {
+                batch.push({
+                    relativePath: change.path,
+                    path: leanPath,
+                    leanBytes,
+                    mode: change.leanCurrent.mode,
+                    language,
+                })
+                continue
+            }
+            const humanSource = await formatter.formatOne(
+                leanSource,
+                join(status.sourceRoot, change.path),
+                status.sourceRoot,
+                opened.config.humanFormatter
             )
-            language.leanify(bytes.toString('utf8'), change.path)
+            try {
+                language.leanify(humanSource, change.path)
+            } catch (error) {
+                throw new FormatterError(`Human formatter produced invalid output for ${change.path}.`, {
+                    cause: error,
+                })
+            }
+            prepared.set(change.path, {
+                kind: 'file',
+                bytes: Buffer.from(humanSource),
+                mode: change.leanCurrent.mode,
+                transformed: true,
+            })
+            continue
         }
         prepared.set(change.path, {
             kind: 'file',
-            bytes,
+            bytes: leanBytes,
             mode: change.leanCurrent.mode,
-            transformed: Boolean(language),
+            transformed: false,
         })
+    }
+    if (batch.length) {
+        const humanFormatter = opened.config.humanFormatter
+        assert(humanFormatter?.type === 'all')
+        try {
+            await formatter.formatAll(
+                batch.map(candidate => candidate.path),
+                status.sourceRoot,
+                humanFormatter
+            )
+            for (const candidate of batch) {
+                const formatted = await snapshot(candidate.path)
+                if (formatted.kind !== 'file')
+                    throw new FormatterError(
+                        `Human formatter did not leave a regular file at ${candidate.relativePath}.`
+                    )
+                const humanBytes = await readFile(candidate.path),
+                    humanSource = humanBytes.toString('utf8')
+                try {
+                    candidate.language.leanify(humanSource, candidate.relativePath)
+                } catch (error) {
+                    throw new FormatterError(
+                        `Human formatter produced invalid output for ${candidate.relativePath}.`,
+                        { cause: error }
+                    )
+                }
+                prepared.set(candidate.relativePath, {
+                    kind: 'file',
+                    bytes: humanBytes,
+                    mode: candidate.mode,
+                    transformed: true,
+                })
+            }
+        } finally {
+            for (const candidate of batch) await replaceFile(candidate.path, candidate.leanBytes, candidate.mode)
+        }
     }
     for (const change of status.leandirChanges) {
         const current = await snapshot(join(status.sourceRoot, change.path))
-        if (!sameSnapshot(change.sourceExpected, current))
+        if (!sameSnapshot(change.sourceCurrent, current))
             throw new WorkspaceConflictError([
                 { ...change, conflict: 'source entry changed after synchronization planning' },
             ])
@@ -359,11 +425,18 @@ async function sync(start = process.cwd(), filename = 'leanprint.json'): Promise
         assert((change.kind === 'deleted') === (item === undefined))
         if (item === undefined) {
             await rm(target, { force: true })
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+            delete opened.config.workspace.files[change.path]
             continue
         }
         await mkdir(dirname(target), { recursive: true })
         if (item.kind === 'file') await replaceFile(target, item.bytes, item.mode)
         else await replaceSymlink(target, item.target)
+        opened.config.workspace.files[change.path] = {
+            source: stored(await snapshot(target), target),
+            lean: stored(await snapshot(join(opened.root, change.path)), change.path),
+            transformed: item.kind === 'file' && item.transformed,
+        }
     }
     opened.config.workspace.state = 'synchronized'
     await saveWorkspace(opened.root, filename, opened.config)

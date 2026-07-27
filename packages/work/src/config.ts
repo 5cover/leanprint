@@ -187,7 +187,17 @@ function resolveLanguages(config: SourceConfig, rules: string[]): ResolvedSource
         ignore: rules,
         languages,
     }
-    if (humanFormatter) resolved.humanFormatter = { command: humanFormatter.command, args: humanFormatter.args ?? [] }
+    if (humanFormatter) {
+        const type = humanFormatter.type ?? 'one',
+            args = humanFormatter.args ?? [],
+            required = type === 'one' ? '{file}' : '{files}',
+            forbidden = type === 'one' ? '{files}' : '{file}'
+        if (args.filter(arg => arg === required).length !== 1)
+            throw new InvalidConfigError(`humanFormatter type "${type}" requires exactly one standalone ${required} argument.`)
+        if (args.includes(forbidden))
+            throw new InvalidConfigError(`humanFormatter type "${type}" does not accept the ${forbidden} argument.`)
+        resolved.humanFormatter = { type, command: humanFormatter.command, args }
+    }
     return resolved
 }
 

@@ -36,13 +36,14 @@
           "examples": [".gitignore", [".gitignore", ".leanprintignore"]]
         },
         "humanFormatter": {
-          "description": "Formatter used only when pulling supported AI-edited source with sync. Lean source is sent on stdin and human source must be returned on stdout. The process runs in the source root with shell:false; every {file} argument placeholder is replaced by the absolute destination filename. Spawn errors, nonzero exits, invalid output, and stderr on failure abort sync before ordinary source writes.",
+          "description": "Formatter used when pulling supported AI-edited source with sync. Type one uses stdin/stdout for one file per process; type all runs once and edits all supplied leandir files in place. Processes run in the source root with shell:false.",
           "type": "object",
           
           "required": ["command"],
           "properties": {
+            "type": { "type": "string", "enum": ["one", "all"], "default": "one", "description": "Whether to format one file through stdin/stdout or all changed files in place with one process." },
             "command": { "type": "string", "minLength": 1, "description": "Executable name or path; it is invoked directly with shell:false.", "examples": ["pnpm"] },
-            "args": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Arguments passed directly to the formatter. Use {file} where the formatter needs the destination path.", "examples": [["exec", "prettier", "--stdin-filepath", "{file}"]] }
+            "args": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Arguments passed directly to the formatter. A standalone {file} is required for type one; a standalone {files} is required for type all and expands to separate argv entries.", "examples": [["exec", "prettier", "--stdin-filepath", "{file}"]] }
           }
         }
       }
