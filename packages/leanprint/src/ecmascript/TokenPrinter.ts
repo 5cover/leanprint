@@ -7,20 +7,16 @@ type Ctx = { parent?: t.Node; position?: ExpressionPosition }
 function cleanJsxText(value: string): string {
     const lines = value.split(/\n|\r\n?/u)
     let lastNonEmptyLine = 0
-    let i = 0
-    for (const line of lines) {
-        if (/\S/u.test(line)) lastNonEmptyLine = i++
-    }
+    for (const [index, line] of lines.entries()) if (/[^ \t]/u.test(line)) lastNonEmptyLine = index
     let result = ''
-    i = 0
-    for (let line of lines) {
-        if (i !== 0) line = line.replace(/[^\S ]\s+/gu, ' ')
-        if (i !== lines.length - 1) line = line.replace(/ +$/u, '')
+    for (const [index, value] of lines.entries()) {
+        let line = value.replace(/\t/gu, ' ')
+        if (index !== 0) line = line.replace(/^ +/u, '')
+        if (index !== lines.length - 1) line = line.replace(/ +$/u, '')
         if (line) {
-            if (i !== lastNonEmptyLine) line += ' '
+            if (index !== lastNonEmptyLine) line += ' '
             result += line
         }
-        i++
     }
     return result
 }
@@ -656,12 +652,13 @@ class TokenPrintSession {
                 return
             case 'TemplateLiteral': {
                 yield this.fixed('`')
-                let i = 0
-                for (const quasi of node.quasis) {
+                for (const [index, quasi] of node.quasis.entries()) {
                     yield { type: 'template-chunk', value: quasi.value.raw }
-                    if (i++ < node.expressions.length) {
+                    if (index < node.expressions.length) {
+                        const expression = node.expressions[index]
+                        if (!expression) throw new UnsupportedNodeError('Malformed template literal')
                         yield this.fixed('${')
-                        yield* this.node(quasi)
+                        yield* this.node(expression)
                         yield this.fixed('}')
                     }
                 }
@@ -1265,12 +1262,13 @@ class TokenPrintSession {
                 return
             case 'TSTemplateLiteralType': {
                 yield this.fixed('`')
-                let i = 0
-                for (const quasi of node.quasis) {
+                for (const [index, quasi] of node.quasis.entries()) {
                     yield { type: 'template-chunk', value: quasi.value.raw }
-                    if (i++ < node.types.length) {
+                    if (index < node.types.length) {
+                        const type = node.types[index]
+                        if (!type) throw new UnsupportedNodeError('Malformed template literal type')
                         yield this.fixed('${')
-                        yield* this.node(quasi)
+                        yield* this.node(type)
                         yield this.fixed('}')
                     }
                 }

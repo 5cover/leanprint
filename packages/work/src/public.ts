@@ -1,3 +1,3 @@
-import Stats from './stats/Stats.js'
+import * as stats from './stats/stats.js'
 import type { TiktokenStatsOptions, TokenStats } from './stats/types.js'
-export const getTiktokenStats = (options: TiktokenStatsOptions): Promise<TokenStats> => Stats.tiktoken(options)
+export const getTiktokenStats = (options: TiktokenStatsOptions): Promise<TokenStats> => stats.tiktoken(options)
