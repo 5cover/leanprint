@@ -36,7 +36,7 @@
           "examples": [".gitignore", [".gitignore", ".leanprintignore"]]
         },
         "humanFormatter": {
-          "description": "Formatter used when pulling supported AI-edited source with sync. Type one uses stdin/stdout for one file per process; type all runs once and edits all supplied leandir files in place. Processes run in the source root with shell:false.",
+          "description": "Formatter used when pulling supported AI-edited source. Type one uses stdin/stdout for one file per process; type all runs once and edits all supplied leandir files in place. Processes run in the source root with shell:false.",
           "type": "object",
           
           "required": ["command"],

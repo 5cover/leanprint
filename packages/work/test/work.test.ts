@@ -127,7 +127,7 @@ test('accepts an empty source config but guards commands that require leandir', 
     assert(loaded.config.languages.json)
     await assert.rejects(leandir.create(root), /add a non-empty "leandir" property to leanprint.json/)
 })
-test('creates, reports edits, and synchronizes a leandir', async () => {
+test('creates, reports edits, and pulls from a leandir', async () => {
     const { root, lean } = await fixture()
     const generated = await leandir.create(root)
     assert.equal(generated.workspace.sourceRoot, root)
@@ -141,12 +141,28 @@ test('creates, reports edits, and synchronizes a leandir', async () => {
         status.changes.map(c => c.kind),
         ['modified']
     )
-    await leandir.sync(lean)
+    await leandir.pull(lean)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer:number=43\n')
     assert.equal((await leandir.open(lean)).config.workspace.state, 'synchronized')
-    await assert.rejects(leandir.sync(lean), /state "synchronized"/)
+    await assert.rejects(leandir.pull(lean), /state "synchronized"/)
 })
-test('synchronizes symlink, kind, and mode changes without following links', async () => {
+test('pull applies leandir-only changes while leaving source-only changes untouched', async () => {
+    const { root, lean } = await fixture()
+    await leandir.create(root)
+    await writeFile(join(root, 'README.md'), 'human edit\n')
+    await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
+
+    const status = await leandir.status(lean)
+    assert.deepEqual(status.sourceChanges.map(change => change.path), ['README.md'])
+    assert.deepEqual(status.leandirChanges.map(change => change.path), ['src/index.ts'])
+    assert.deepEqual(status.conflicts, [])
+
+    await leandir.pull(lean)
+    assert.equal(await readFile(join(root, 'README.md'), 'utf8'), 'human edit\n')
+    assert.equal(await readFile(join(lean, 'README.md'), 'utf8'), 'hello\n')
+    assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer:number=43\n')
+})
+test('pulls symlink, kind, and mode changes without following links', async () => {
     const { root, lean } = await fixture()
     await symlink('README.md', join(root, 'link'))
     await leandir.create(root)
@@ -160,7 +176,7 @@ test('synchronizes symlink, kind, and mode changes without following links', asy
     const status = await leandir.status(lean)
     assert.equal(status.conflicts.length, 0)
     assert.equal(status.changes.length, 3)
-    await leandir.sync(lean)
+    await leandir.pull(lean)
     assert.equal(await readlink(join(root, 'link')), 'src/index.ts')
     assert.equal(await readlink(join(root, 'README.md')), 'src/index.ts')
     assert.equal((await lstat(join(root, 'src', 'index.ts'))).mode & 0o777, 0o755)
@@ -185,7 +201,7 @@ test('reports all concurrent source conflicts before writing', async () => {
 
     const status = await leandir.status(lean)
     assert.equal(status.conflicts.length, 2)
-    await assert.rejects(leandir.sync(lean), /Synchronization has 2 conflict/)
+    await assert.rejects(leandir.pull(lean), /Pull has 2 conflict/)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 44;\n')
     assert.equal(await readFile(join(root, 'README.md'), 'utf8'), 'human edit\n')
     assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
@@ -206,7 +222,7 @@ test('formatter failure aborts before source-project writes', async () => {
     await leandir.create(root)
     await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
 
-    await assert.rejects(leandir.sync(lean), /formatter failed/)
+    await assert.rejects(leandir.pull(lean), /formatter failed/)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
     assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
 })
@@ -227,7 +243,7 @@ test('identifies invalid human formatter stdout and writes nothing', async () =>
     await leandir.create(root)
     await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
 
-    await assert.rejects(leandir.sync(lean), /Human formatter produced invalid output for src\/index\.ts/)
+    await assert.rejects(leandir.pull(lean), /Human formatter produced invalid output for src\/index\.ts/)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
     assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
 })
@@ -253,17 +269,17 @@ test('detects source changes made during formatter preflight before ordinary wri
     await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
     await writeFile(join(lean, 'README.md'), 'AI edit\n')
 
-    await assert.rejects(leandir.sync(lean), /source entry changed after synchronization planning/)
+    await assert.rejects(leandir.pull(lean), /source entry changed after pull planning/)
     assert.equal(await readFile(join(root, 'README.md'), 'utf8'), 'hello\n')
     assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
 })
 
-test('refreshes workspace snapshots after successful synchronization', async () => {
+test('refreshes workspace snapshots after a successful pull', async () => {
     const { root, lean } = await fixture()
     await leandir.create(root)
     await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
     await writeFile(join(lean, 'added.txt'), 'added\n')
-    await leandir.sync(lean)
+    await leandir.pull(lean)
 
     const status = await leandir.status(lean)
     assert.equal(status.state, 'synchronized')
@@ -298,7 +314,7 @@ test('batch formatter expands files as argv entries, ignores stdout, and restore
     const indexLean = await readFile(join(lean, 'src', 'index.ts')),
         spacedLean = await readFile(join(lean, 'src', 'with space.ts'))
 
-    await leandir.sync(lean)
+    await leandir.pull(lean)
 
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), `${indexLean.toString()}// formatted\n`)
     assert.equal(await readFile(join(root, 'src', 'with space.ts'), 'utf8'), `${spacedLean.toString()}// formatted\n`)
@@ -332,7 +348,7 @@ test('batch formatter failure restores every lean file and writes no source file
     const indexLean = await readFile(join(lean, 'src', 'index.ts')),
         secondLean = await readFile(join(lean, 'src', 'second.ts'))
 
-    await assert.rejects(leandir.sync(lean), /failed/)
+    await assert.rejects(leandir.pull(lean), /failed/)
     assert.deepEqual(await readFile(join(lean, 'src', 'index.ts')), indexLean)
     assert.deepEqual(await readFile(join(lean, 'src', 'second.ts')), secondLean)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
@@ -357,7 +373,7 @@ test('invalid batch formatter output restores all lean files and writes nothing'
     await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
     const leanBytes = await readFile(join(lean, 'src', 'index.ts'))
 
-    await assert.rejects(leandir.sync(lean), /Human formatter produced invalid output/)
+    await assert.rejects(leandir.pull(lean), /Human formatter produced invalid output/)
     assert.deepEqual(await readFile(join(lean, 'src', 'index.ts')), leanBytes)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
 })
@@ -380,7 +396,7 @@ test('batch formatter restores a file deleted by the subprocess', async () => {
     await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=43\n')
     const leanBytes = await readFile(join(lean, 'src', 'index.ts'))
 
-    await assert.rejects(leandir.sync(lean), /did not leave a regular file/)
+    await assert.rejects(leandir.pull(lean), /did not leave a regular file/)
     assert.deepEqual(await readFile(join(lean, 'src', 'index.ts')), leanBytes)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer: number = 42;\n')
 })
@@ -442,7 +458,7 @@ test('updates source changes from either root while preserving unrelated AI edit
     const before = await leandir.status(root)
     assert.equal(before.sourceChanges.length, 4)
     assert.equal(before.leandirChanges.length, 1)
-    await leandir.update(lean)
+    await leandir.push(lean)
     assert.equal(await readFile(join(lean, 'README.md'), 'utf8'), 'AI edit\n')
     assert.equal(await readFile(join(lean, 'src', 'index.ts'), 'utf8'), 'export const answer:number=44\n')
     assert.deepEqual(await readFile(join(lean, 'added.bin')), Buffer.from([0, 1, 2]))
@@ -454,14 +470,14 @@ test('updates source changes from either root while preserving unrelated AI edit
     assert.equal(after.leandirChanges.length, 1)
 })
 
-test('update reports every same-path conflict and writes nothing', async () => {
+test('push reports every same-path conflict and writes nothing', async () => {
     const { root, lean } = await fixture()
     await leandir.create(root)
     await writeFile(join(root, 'README.md'), 'human\n')
     await writeFile(join(lean, 'README.md'), 'AI\n')
     await writeFile(join(root, 'src', 'index.ts'), 'export const answer = 1\n')
     await writeFile(join(lean, 'src', 'index.ts'), 'export const answer=2\n')
-    await assert.rejects(leandir.update(root), /Update has 2 conflict/)
+    await assert.rejects(leandir.push(root), /Push has 2 conflict/)
     assert.equal(await readFile(join(lean, 'README.md'), 'utf8'), 'AI\n')
     assert.equal((await leandir.open(lean)).config.workspace.state, 'active')
 })
@@ -477,10 +493,10 @@ test('resolved hashes ignore JSON formatting but detect semantic and ignore-file
     assert.equal((await leandir.status(root)).configChanged, false)
     await writeFile(join(root, '.ignore'), 'other.txt\n')
     assert.equal((await leandir.status(root)).configChanged, true)
-    await assert.rejects(leandir.sync(root), /leanprint update/)
+    await assert.rejects(leandir.pull(root), /leanprint push/)
 })
 
-test('formatter-only update enables recovery and sync accepts a source path', async () => {
+test('formatter-only push enables recovery and pull accepts a source path', async () => {
     const { root, lean } = await fixture()
     const configPath = join(root, 'leanprint.json')
     await writeFile(
@@ -489,7 +505,7 @@ test('formatter-only update enables recovery and sync accepts a source path', as
     )
     await leandir.create(root)
     await writeFile(join(lean, 'src', 'index.ts'), 'export const answer:number=45\n')
-    await assert.rejects(leandir.sync(root), /No human formatter/)
+    await assert.rejects(leandir.pull(root), /No human formatter/)
     await writeFile(
         configPath,
         JSON.stringify({
@@ -499,13 +515,13 @@ test('formatter-only update enables recovery and sync accepts a source path', as
             humanFormatter: { command: process.execPath, args: ['-e', 'process.stdin.pipe(process.stdout)', '{file}'] },
         })
     )
-    await leandir.update(root)
+    await leandir.push(root)
     assert.equal((await leandir.status(root)).leandirChanges.length, 1)
-    await leandir.sync(root)
+    await leandir.pull(root)
     assert.equal(await readFile(join(root, 'src', 'index.ts'), 'utf8'), 'export const answer:number=45\n')
 })
 
-test('update reconciles ignore and language projection changes', async () => {
+test('push reconciles ignore and language projection changes', async () => {
     const { root, lean } = await fixture()
     const configPath = join(root, 'leanprint.json')
     await writeFile(join(root, 'hidden.txt'), 'hidden')
@@ -525,7 +541,7 @@ test('update reconciles ignore and language projection changes', async () => {
         pending.sourceChanges.map(change => change.path),
         ['hidden.txt', 'src/index.ts']
     )
-    await leandir.update(root)
+    await leandir.push(root)
     await assert.rejects(readFile(join(lean, 'hidden.txt')), /ENOENT/)
     assert.equal(await readFile(join(lean, 'src', 'index.ts'), 'utf8'), 'export const answer:number = 42\n')
 })
@@ -533,12 +549,14 @@ test('update reconciles ignore and language projection changes', async () => {
 test('CLI help documents commands, direction, examples, and safety', async () => {
     const cli = join(import.meta.dirname, '..', 'src', 'cli.ts')
     const root = await exec(process.execPath, ['--import', 'tsx', cli, '--help'])
-    assert.match(root.stdout, /update \[path\].*Push source-project/s)
-    assert.match(root.stdout, /sync \[path\].*Pull AI changes/s)
-    const update = await exec(process.execPath, ['--import', 'tsx', cli, 'update', '--help'])
-    assert.match(update.stdout, /Example:/)
-    assert.match(update.stdout, /Safety:/)
-    const sync = await exec(process.execPath, ['--import', 'tsx', cli, 'sync', '--help'])
-    assert.match(sync.stdout, /source project or leandir path/)
-    assert.match(sync.stdout, /Run update first/)
+    assert.match(root.stdout, /push \[path\].*Push source-project/s)
+    assert.match(root.stdout, /pull \[path\].*Pull AI changes/s)
+    assert.doesNotMatch(root.stdout, /\bupdate \[path\]/)
+    assert.doesNotMatch(root.stdout, /\bsync \[path\]/)
+    const push = await exec(process.execPath, ['--import', 'tsx', cli, 'push', '--help'])
+    assert.match(push.stdout, /Example:/)
+    assert.match(push.stdout, /Safety:/)
+    const pull = await exec(process.execPath, ['--import', 'tsx', cli, 'pull', '--help'])
+    assert.match(pull.stdout, /source project or leandir path/)
+    assert.match(pull.stdout, /Run push first/)
 })

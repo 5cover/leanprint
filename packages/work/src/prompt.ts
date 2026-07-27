@@ -39,7 +39,7 @@ export function generate(config: ResolvedSourceConfig, inLeandir: boolean): stri
         parts.push(
             'Do not run Prettier or apply conventional human formatting inside this leandir.',
             'Do not edit the generated config file or its workspace metadata.',
-            "A separate sync step will apply the source project's human formatter; LeanPrint does not restore original formatting."
+            "A separate pull step will apply the source project's human formatter; LeanPrint does not restore original formatting."
         )
     return `${parts.join(' ')}\n`
 }

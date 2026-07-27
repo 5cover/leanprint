@@ -66,7 +66,7 @@ export class LeandirExistsError extends Error {
 }
 export class WorkspaceConflictError extends Error {
     override name = 'WorkspaceConflictError'
-    constructor(public readonly conflicts: Change[], operation = 'Synchronization') {
+    constructor(public readonly conflicts: Change[], operation = 'Pull') {
         super(
             `${operation} has ${conflicts.length} conflict(s):\n${conflicts.map(c => `- ${c.path}: ${c.conflict}`).join('\n')}`
         )

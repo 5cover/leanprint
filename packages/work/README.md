@@ -1,6 +1,6 @@
 # @leanprint/work
 
-Workflow tools and the `leanprint` executable. This package depends on `leanprint` and owns config discovery, direct file formatting, leandir creation/status/sync/cleanup, human formatter invocation, deterministic prompts, SHA-256 workspace metadata, conflict detection, and tiktoken statistics.
+Workflow tools and the `leanprint` executable. This package depends on `leanprint` and owns config discovery, direct file formatting, leandir creation/status/push/pull/cleanup, human formatter invocation, deterministic prompts, SHA-256 workspace metadata, conflict detection, and tiktoken statistics.
 
 The source transformation library is published separately as [`leanprint`](https://www.npmjs.com/package/leanprint).
 
@@ -9,11 +9,11 @@ npm install --global @leanprint/work
 leanprint --help
 ```
 
-`leanprint update [path]` pushes source-project changes into an active leandir. `leanprint sync [path]` pulls AI changes back; both accept either project path. Both are preflighted, and any path changed on both sides prevents all ordinary writes. Unsupported files are copied byte-for-byte and receive the same conflict protection as supported source.
+`leanprint push [path]` sends source-project changes into an active leandir. `leanprint pull [path]` retrieves AI changes; both accept either project path. Both are preflighted, and any path changed on both sides prevents all ordinary writes. Source-only changes do not block a pull and remain untouched. Unsupported files are copied byte-for-byte and receive the same conflict protection as supported source.
 
-Workspace metadata is stored in the generated config and protected by an integrity hash. A separate resolved-configuration hash covers defaults, absolute paths, loaded ignore rules, language and formatter settings, and retained extension properties. Source config changes require `update` before sync. Formatter-only updates preserve AI edits, enabling the recovery sequence `leanprint update` followed by `leanprint sync`.
+Workspace metadata is stored in the generated config and protected by an integrity hash. A separate resolved-configuration hash covers defaults, absolute paths, loaded ignore rules, language and formatter settings, and retained extension properties. Source config changes require `push` before pull. Formatter-only changes preserve AI edits when pushed before pulling.
 
-Entries are replaced atomically one at a time. Before writes, update records `updating` and sync records `applying`; interruption leaves that state in place and refuses unsafe retries. Successful update returns to `active`; successful sync seals the workspace as `synchronized`.
+Entries are replaced atomically one at a time. Before writes, push records `updating` and pull records `applying`; interruption leaves that state in place and refuses unsafe retries. Successful push returns to `active`; successful pull seals the workspace as `synchronized`.
 
 Project configuration is optional. When upward discovery finds no file, LeanPrint uses an in-memory empty configuration rooted at the requested project path. Configuration files are validated against [SourceConfig.json](https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json); add that URL as `$schema` for editor validation.
 

@@ -48,28 +48,28 @@ program
         process.stdout.write(`Created leandir: ${generated.workspace.leandir}\n`)
     })
 program
-    .command('sync')
+    .command('pull')
     .description('Pull AI changes from an active leandir back to its source project.')
     .argument('[path]', 'source project or leandir path', process.cwd())
     .addHelpText(
         'after',
-        '\nExample:\n  leanprint sync /tmp/project.lean\n\nSafety: all conflicts and formatter output are checked before source files are written. Run update first when source settings or files changed.\n'
+        '\nExample:\n  leanprint pull /tmp/project.lean\n\nSafety: all same-path conflicts and formatter output are checked before source files are written. Source-only changes are left untouched. Run push first when source settings changed.\n'
     )
     .action(async path => {
-        const status = await leandir.sync(path, program.opts().config)
-        process.stdout.write(`Synchronized ${status.changes.length} change(s) to ${status.sourceRoot}.\n`)
+        const status = await leandir.pull(path, program.opts().config)
+        process.stdout.write(`Pulled ${status.changes.length} change(s) to ${status.sourceRoot}.\n`)
     })
 program
-    .command('update')
+    .command('push')
     .description('Push source-project and configuration changes into an active leandir.')
     .argument('[path]', 'source project or leandir path', process.cwd())
     .addHelpText(
         'after',
-        '\nExample:\n  leanprint update ~/project\n\nSafety: paths changed on both sides are conflicts; every conflict is reported before any ordinary file is written.\n'
+        '\nExample:\n  leanprint push ~/project\n\nSafety: paths changed on both sides are conflicts; every conflict is reported before any ordinary file is written.\n'
     )
     .action(async path => {
-        const status = await leandir.update(path, program.opts().config)
-        process.stdout.write(`Updated ${status.sourceChanges.length} change(s) in ${status.leandir}.\n`)
+        const status = await leandir.push(path, program.opts().config)
+        process.stdout.write(`Pushed ${status.sourceChanges.length} change(s) to ${status.leandir}.\n`)
     })
 program
     .command('prompt')
@@ -89,13 +89,13 @@ program
     })
 program
     .command('status')
-    .description('Report source-side update work, leandir-side sync work, and conflicts.')
+    .description('Report source-side push work, leandir-side pull work, and conflicts.')
     .argument('[path]', 'project or leandir path', process.cwd())
     .addHelpText('after', '\nExample:\n  leanprint status ~/project\n')
     .action(async path => {
         const status = await leandir.status(path, program.opts().config)
         process.stdout.write(
-            `Context: ${status.context}\nState: ${status.state}\nSource root: ${status.sourceRoot}\nLeandir: ${status.leandir}\nConfiguration changed: ${status.configChanged ? 'yes (update required)' : 'no'}\nPending update changes: ${status.sourceChanges.length}\nPending sync changes: ${status.leandirChanges.length}\nConflicts: ${status.conflicts.length}\n`
+            `Context: ${status.context}\nState: ${status.state}\nSource root: ${status.sourceRoot}\nLeandir: ${status.leandir}\nConfiguration changed: ${status.configChanged ? 'yes (push required)' : 'no'}\nPending push changes: ${status.sourceChanges.length}\nPending pull changes: ${status.leandirChanges.length}\nConflicts: ${status.conflicts.length}\n`
         )
         for (const conflict of status.conflicts) process.stdout.write(`- ${conflict.path}: ${conflict.conflict}\n`)
     })

@@ -29,7 +29,7 @@
           ],
           "properties": {
             "schemaVersion": { "const": 2, "description": "Workspace metadata schema version." },
-            "state": { "type": "string", "enum": ["active", "updating", "applying", "synchronized"], "description": "Active workspaces may be updated or synchronized. Interrupted applying/updating states refuse unsafe retries." },
+            "state": { "type": "string", "enum": ["active", "updating", "applying", "synchronized"], "description": "Active workspaces may be pushed or pulled. Interrupted applying/updating states refuse unsafe retries." },
             "toolVersion": { "type": "string", "description": "Version that created the workspace.", "examples": ["1.0.0"] },
             "sourceRoot": { "type": "string", "description": "Absolute source-project root captured for this session.", "examples": ["/home/user/project"] },
             "leandir": { "type": "string", "description": "Absolute materialized leandir root.", "examples": ["/tmp/project.lean"] },

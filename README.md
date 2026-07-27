@@ -42,25 +42,25 @@ leanprint prompt
 # Start the AI agent in this directory.
 
 leanprint status
-leanprint update # Push human/source-project changes into the leandir.
-leanprint sync
+leanprint push # Push human/source-project changes into the leandir.
+leanprint pull
 ```
 
-A leandir is a materialized AI-oriented working copy, not a mount, cache, Git worktree, or live mirror. `create` leanifies supported files and copies unsupported files byte-for-byte. During an active session, `update` pushes source additions, edits, deletions, modes, symlinks, ignore changes, and language-setting changes into the leandir while preserving unrelated AI edits. `sync` pulls AI changes back. A path changed on both sides is a conflict; both operations discover all conflicts before writing. A successful sync seals the workspace session.
+A leandir is a materialized AI-oriented working copy, not a mount, cache, Git worktree, or live mirror. `create` leanifies supported files and copies unsupported files byte-for-byte. During an active session, `push` sends source additions, edits, deletions, modes, symlinks, ignore changes, and language-setting changes into the leandir while preserving unrelated AI edits. `pull` retrieves AI changes. A path changed on both sides is a conflict; source-only changes do not block a pull and remain untouched. Both operations discover all conflicts before writing. A successful pull seals the workspace session.
 
-The generated config records a canonical SHA-256 hash of the fully resolved session configuration, including defaults, the absolute leandir, loaded ignore-file rules, language settings, formatter settings, and extension properties. JSON formatting is irrelevant. If source configuration changes, `sync` asks you to run `update`; generated settings and workspace metadata remain integrity-protected against edits.
+The generated config records a canonical SHA-256 hash of the fully resolved session configuration, including defaults, the absolute leandir, loaded ignore-file rules, language settings, formatter settings, and extension properties. JSON formatting is irrelevant. If source configuration changes, `pull` asks you to run `push`; generated settings and workspace metadata remain integrity-protected against edits.
 
-Each destination entry is replaced atomically, but the MVP does not claim project-wide rollback after an operating-system I/O failure partway through application. The workspace is first marked `applying`; if application fails, it remains in that state and refuses another sync so partial application cannot be mistaken for a clean session.
+Each destination entry is replaced atomically, but the MVP does not claim project-wide rollback after an operating-system I/O failure partway through application. The workspace is first marked `applying`; if application fails, it remains in that state and refuses another pull so partial application cannot be mistaken for a clean session.
 
 ## Commands
 
 ```txt
 leanprint [-c filename] format <file> [--write] [--language ecmascript|json]
 leanprint [-c filename] create [root] [--force]
-leanprint [-c filename] update [path]
+leanprint [-c filename] push [path]
 leanprint [-c filename] prompt [path]
 leanprint [-c filename] status [path]
-leanprint [-c filename] sync [path]
+leanprint [-c filename] pull [path]
 leanprint [-c filename] clean [path] [--force]
 leanprint [-c filename] stats tiktoken [model-or-encoding] [--json]
 ```
@@ -92,9 +92,9 @@ The default config filename is `leanprint.json`. `-c` accepts a repository-relat
 }
 ```
 
-The human formatter is started directly with `shell:false` in the source root. Batch mode (`type: "all"`) expands the standalone `"{files}"` argument into absolute leandir paths and expects the formatter to edit them in place. LeanPrint invokes it once, reads and validates every result, and restores the lean files in a `finally` block before writing human source. Successful stdout such as package-manager progress is ignored. Single-file mode (`type: "one"`, the default) writes lean source to stdin, reads human source from stdout, and replaces a standalone `"{file}"` argument with the absolute human destination path. Spawn failures, nonzero exits, invalid output, and source races abort sync before ordinary source writes.
+The human formatter is started directly with `shell:false` in the source root. Batch mode (`type: "all"`) expands the standalone `"{files}"` argument into absolute leandir paths and expects the formatter to edit them in place. LeanPrint invokes it once, reads and validates every result, and restores the lean files in a `finally` block before writing human source. Successful stdout such as package-manager progress is ignored. Single-file mode (`type: "one"`, the default) writes lean source to stdin, reads human source from stdout, and replaces a standalone `"{file}"` argument with the absolute human destination path. Spawn failures, nonzero exits, invalid output, and source races abort pull before ordinary source writes.
 
-Workspace states are `active`, `updating`, `applying`, and `synchronized`. Only `active` workspaces accept update or sync. An interrupted write remains in its transitional state and refuses unsafe retries. Unsupported files participate in the same baselines and conflicts as supported source, but are copied unchanged in both directions.
+Workspace states are `active`, `updating`, `applying`, and `synchronized`. Only `active` workspaces accept push or pull. An interrupted write remains in its transitional state and refuses unsafe retries. Unsupported files participate in the same baselines and conflicts as supported source, but are copied unchanged in both directions.
 
 Every top-level source configuration property is optional. An absent or empty `languages` object enables every registered domain; a non-empty object enables only its keys. `leandir` is required only by workspace commands, while formatting, prompts, and statistics work without it. Parser, token, source, and ignore defaults are applied during resolution. Additional properties are retained for forward compatibility. The canonical [source-project configuration schema](https://raw.githubusercontent.com/5cover/leanprint/main/packages/work/src/schemas/SourceConfig.json) can be assigned to `$schema` for editor validation.
 

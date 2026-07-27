@@ -31,7 +31,7 @@ type BatchCandidate = {
     language: NonNullable<ReturnType<typeof configuredLanguage>>
 }
 
-export { create, open, status, sync, update }
+export { create, open, pull, push, status }
 
 function stored(entry: EntrySnapshot, path: string): StoredEntry {
     if (entry.kind === 'file' || entry.kind === 'symlink') return entry
@@ -237,14 +237,14 @@ async function status(start = process.cwd(), filename = 'leanprint.json'): Promi
     return await statusOpened(opened, currentConfig, workspaceContext, filename)
 }
 
-async function update(start = process.cwd(), filename = 'leanprint.json'): Promise<WorkspaceStatus> {
+async function push(start = process.cwd(), filename = 'leanprint.json'): Promise<WorkspaceStatus> {
     const { opened, currentConfig, context: workspaceContext } = await context(start, filename)
     if (opened.config.workspace.state !== 'active')
         throw new InvalidLeandirError(
-            `Cannot update a workspace in state "${opened.config.workspace.state}". Create a new leandir session.`
+            `Cannot push to a workspace in state "${opened.config.workspace.state}". Create a new leandir session.`
         )
     const status = await statusOpened(opened, currentConfig, workspaceContext, filename)
-    if (status.conflicts.length) throw new WorkspaceConflictError(status.conflicts, 'Update')
+    if (status.conflicts.length) throw new WorkspaceConflictError(status.conflicts, 'Push')
 
     const prepared = new Map<string, Prepared>()
     for (const change of status.sourceChanges) {
@@ -262,7 +262,7 @@ async function update(start = process.cwd(), filename = 'leanprint.json'): Promi
             : { kind: 'missing' as const }
         const leanNow = await snapshot(join(opened.root, change.path))
         if (!sameSnapshot(change.sourceCurrent, sourceNow) || !sameSnapshot(change.leanCurrent, leanNow))
-            throw new WorkspaceConflictError([{ ...change, conflict: 'path changed after update planning' }], 'Update')
+            throw new WorkspaceConflictError([{ ...change, conflict: 'path changed after push planning' }], 'Push')
     }
 
     opened.config.workspace.state = 'updating'
@@ -299,22 +299,18 @@ async function update(start = process.cwd(), filename = 'leanprint.json'): Promi
     return status
 }
 
-async function sync(start = process.cwd(), filename = 'leanprint.json'): Promise<WorkspaceStatus> {
+async function pull(start = process.cwd(), filename = 'leanprint.json'): Promise<WorkspaceStatus> {
     const { opened, currentConfig, context: workspaceContext } = await context(start, filename)
     if (opened.config.workspace.state !== 'active')
         throw new InvalidLeandirError(
-            `Cannot synchronize a workspace in state "${opened.config.workspace.state}". Create a new leandir session.`
+            `Cannot pull from a workspace in state "${opened.config.workspace.state}". Create a new leandir session.`
         )
     const status = await statusOpened(opened, currentConfig, workspaceContext, filename)
     if (status.configChanged)
         throw new InvalidLeandirError(
-            'Source configuration changed after the last refresh; run `leanprint update` first.'
+            'Source configuration changed after the last push; run `leanprint push` first.'
         )
     if (status.conflicts.length) throw new WorkspaceConflictError(status.conflicts)
-    if (status.sourceChanges.length)
-        throw new InvalidLeandirError(
-            'Source project has changes pending; run `leanprint update` before `leanprint sync`.'
-        )
 
     const prepared = new Map<string, Prepared>(),
         batch: BatchCandidate[] = []
@@ -413,7 +409,7 @@ async function sync(start = process.cwd(), filename = 'leanprint.json'): Promise
         const current = await snapshot(join(status.sourceRoot, change.path))
         if (!sameSnapshot(change.sourceCurrent, current))
             throw new WorkspaceConflictError([
-                { ...change, conflict: 'source entry changed after synchronization planning' },
+                { ...change, conflict: 'source entry changed after pull planning' },
             ])
     }
 
