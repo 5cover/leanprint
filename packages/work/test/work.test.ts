@@ -115,6 +115,30 @@ test('uses an in-memory default config at the explicit root when discovery finds
     const result = await stats.tiktoken({ root, modelOrEncoding: 'o200k_base' })
     assert.equal(result.files, 2)
     assert(result.tokensSaved > 0)
+    assert.deepEqual(Object.keys(result.languages), ['ecmascript', 'json'])
+    assert.equal(result.languages.ecmascript?.files, 1)
+    assert.equal(result.languages.json?.files, 1)
+    assert.equal(
+        Object.values(result.languages).reduce((total, language) => total + language.originalTokens, 0),
+        result.originalTokens
+    )
+    assert.equal(
+        Object.values(result.languages).reduce((total, language) => total + language.leanTokens, 0),
+        result.leanTokens
+    )
+    const cli = join(import.meta.dirname, '..', 'src', 'cli.ts'),
+        output = await exec(process.execPath, [
+            '--import',
+            'tsx',
+            cli,
+            'stats',
+            'tiktoken',
+            'o200k_base',
+            '--root',
+            root,
+        ])
+    assert.match(output.stdout, /Language: ecmascript\nFiles: 1/)
+    assert.match(output.stdout, /Language: json\nFiles: 1/)
     await assert.rejects(leandir.create(root), /No leandir is configured/)
 })
 

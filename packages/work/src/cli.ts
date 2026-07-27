@@ -143,6 +143,10 @@ statsCommand
         process.stdout.write(
             `Tokenizer: ${result.requested}\nEncoding: ${result.encoding}\nFiles: ${n.format(result.files)}\n\nOriginal tokens: ${n.format(result.originalTokens)}\nLeanPrint tokens: ${n.format(result.leanTokens)}\nTokens saved: ${n.format(result.tokensSaved)}\nReduction: ${result.reductionPercentage.toFixed(2)}%\n`
         )
+        for (const [language, languageStats] of Object.entries(result.languages))
+            process.stdout.write(
+                `\nLanguage: ${language}\nFiles: ${n.format(languageStats.files)}\nOriginal tokens: ${n.format(languageStats.originalTokens)}\nLeanPrint tokens: ${n.format(languageStats.leanTokens)}\nTokens saved: ${n.format(languageStats.tokensSaved)}\nReduction: ${languageStats.reductionPercentage.toFixed(2)}%\n`
+            )
     })
 program.parseAsync().catch((error: unknown) => {
     process.stderr.write(`Error: ${(error as Error).message}\n`)
