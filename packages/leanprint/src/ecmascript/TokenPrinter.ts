@@ -378,7 +378,12 @@ class TokenPrintSession {
             case 'ArrowFunctionExpression':
                 if (node.async) yield this.fixed('async')
                 if (node.typeParameters) yield* this.node(node.typeParameters, { parent: node })
-                if (node.params.length === 1 && node.params[0]?.type === 'Identifier' && !node.params[0].typeAnnotation)
+                if (
+                    node.params.length === 1 &&
+                    node.params[0]?.type === 'Identifier' &&
+                    !node.params[0].typeAnnotation &&
+                    !node.returnType
+                )
                     yield* this.node(node.params[0])
                 else {
                     yield this.fixed('(')

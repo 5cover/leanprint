@@ -136,6 +136,7 @@ const typescriptFixtures = [
     `abstract class Service{abstract method<T>(value:T):T;constructor(public readonly value:string){} accessor?:string}`,
     `type Query=typeof import("./types").value;type Indexed<T>=T[keyof T];type Inferred<T>=T extends infer U?U:never`,
     `import value,{type Kind as OtherKind,named as renamed} from "pkg" with {type:"json"};import * as ns from "other"`,
+    `const styled=expansions.filter((item):item is Expansion<T>&{styles:readonly[StyleElement<T>|null,...(StyleElement<T>|null)[]]}=>item.styles.length>0)`,
 ]
 
 for (const [index, fixture] of typescriptFixtures.entries()) {
