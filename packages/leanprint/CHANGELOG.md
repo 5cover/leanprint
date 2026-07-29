@@ -1,5 +1,11 @@
 # leanprint
 
+## 2.0.1
+
+### Patch Changes
+
+- Fixed an issue with missed bracketization of the parameter emission of monadic arrow functions having a return type. Added a regression fixture.
+
 ## 2.0.0
 
 ### Major Changes

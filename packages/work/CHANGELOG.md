@@ -1,5 +1,12 @@
 # @leanprint/work
 
+## 2.0.1
+
+### Patch Changes
+
+- Updated dependencies
+  - leanprint@2.0.1
+
 ## 2.0.0
 
 ### Major Changes
