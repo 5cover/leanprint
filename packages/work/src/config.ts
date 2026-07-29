@@ -140,10 +140,7 @@ async function resolveSource(config: SourceConfig, path: string): Promise<Resolv
             ? config.ignoreFile
             : [config.ignoreFile]
         : []
-    const rules: string[] =
-        config.ignore === undefined && config.ignoreFile === undefined
-            ? ['.git/', 'node_modules/', 'dist/', 'coverage/']
-            : []
+    const rules: string[] = []
     for (const filename of filenames) {
         const ignorePath = isAbsolute(filename) ? filename : resolve(dirname(path), filename)
         try {

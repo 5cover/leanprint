@@ -41,13 +41,13 @@ test('uses locale-independent ordinal string ordering', () => {
     assert.deepEqual(['z', 'ä', 'a'].sort(compareStrings), ['a', 'z', 'ä'])
     assert.equal(stableJson({ ä: 1, z: 2, a: 3 }), '{"a":3,"z":2,"ä":1}')
 })
-test('applies schema defaults while retaining additional properties', async () => {
+test('applies schema defaults', async () => {
     const { root } = await fixture()
     const path = join(root, 'leanprint.json')
     await writeFile(path, JSON.stringify({ leandir: `${root}.lean`, languages: { ecmascript: {} }, extension: true }))
     const loaded = await cfg.load(path)
     assert.equal(loaded.kind, 'source')
-    assert.deepEqual(loaded.config.ignore, ['.git/', 'node_modules/', 'dist/', 'coverage/'])
+    assert.deepEqual(loaded.config.ignore, [])
     assert.equal(loaded.config.languages.ecmascript?.tokens.semicolons, false)
     assert.equal(loaded.config.languages.ecmascript.source.indent, 2)
     assert.equal(loaded.config.extension, true)
@@ -96,10 +96,8 @@ test('an explicitly empty languages map enables every registered language', asyn
 
 test('uses an in-memory default config at the explicit root when discovery finds no file', async () => {
     const root = await mkdtemp(join(tmpdir(), 'leanprint-configless-'))
-    await mkdir(join(root, 'node_modules'))
     await writeFile(join(root, 'index.ts'), 'export const answer = 42;\n')
     await writeFile(join(root, 'data.json'), '{ "items": [1, 2, 3] }\n')
-    await writeFile(join(root, 'node_modules', 'ignored.ts'), 'export const ignored = true;\n')
 
     const found = await cfg.discover(root)
     assert.equal(found.root, root)
@@ -109,7 +107,7 @@ test('uses an in-memory default config at the explicit root when discovery finds
     assert.equal(resolved.config.leandir, undefined)
     assert(resolved.config.languages.ecmascript)
     assert(resolved.config.languages.json)
-    assert.deepEqual(resolved.config.ignore, ['.git/', 'node_modules/', 'dist/', 'coverage/'])
+    assert.deepEqual(resolved.config.ignore, [])
     assert.match(prompt.generate(resolved.config, false), /For JSON files/)
 
     const result = await stats.tiktoken({ root, modelOrEncoding: 'o200k_base' })
